@@ -8,7 +8,6 @@
       (function() {
         var search = window.location.search || '';
         var hash = window.location.hash || '';
-        // If a user landed on /M-M/docs/ or any broken link, redirect to root /M-M/ with params preserved
         if (window.location.hostname.includes('github.io')) {
           window.location.replace('/M-M/' + search + hash);
         } else {
