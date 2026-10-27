@@ -1309,9 +1309,6 @@ export default function DigitalChecklistScreen({
                     <CheckCheck size={14} />
                     <span>Submit Obs.</span>
                   </button>
-                  <span style={{ display: 'block', fontSize: '0.62rem', color: '#047857', marginTop: '3px', fontWeight: 600 }}>
-                    🕒 Auto-records Date & Time
-                  </span>
                 </td>
               </tr>
               )}
