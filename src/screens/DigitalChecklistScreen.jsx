@@ -30,7 +30,8 @@ export default function DigitalChecklistScreen({
   position,
   activeSite,
   onNavigate,
-  onOpenPhotos
+  onOpenPhotos,
+  isDirectScanMode = false
 }) {
   // Determine template (default CL-11 or position's template)
   const defaultTemplateId = position?.templateId || 'CL-11';
@@ -370,9 +371,11 @@ export default function DigitalChecklistScreen({
     if (result.success) {
       setCapturedTimestamp(fullTimestamp);
       setSaveSuccessNotice(`Checklist recorded successfully. Inspected by ${inspectingTechName.trim()} on ${formattedDate} at ${formattedTime}.`);
-      setTimeout(() => {
-        onNavigate('photo-remarks');
-      }, 700);
+      if (!isDirectScanMode) {
+        setTimeout(() => {
+          onNavigate('photo-remarks');
+        }, 700);
+      }
     }
   };
 
@@ -513,19 +516,82 @@ export default function DigitalChecklistScreen({
 
       {saveSuccessNotice && (
         <div style={{
-          padding: '14px 16px',
-          borderRadius: '8px',
+          padding: '16px 18px',
+          borderRadius: '10px',
           backgroundColor: '#ECFDF5',
-          color: '#059669',
-          border: '1px solid #A7F3D0',
+          color: '#065F46',
+          border: '1.5px solid #A7F3D0',
           display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '0.88rem',
-          fontWeight: 600
+          flexDirection: 'column',
+          gap: '10px'
         }}>
-          <CheckCircle2 size={20} />
-          <span>{saveSuccessNotice}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.92rem', fontWeight: 700 }}>
+            <CheckCircle2 size={22} color="#059669" />
+            <span>{saveSuccessNotice}</span>
+          </div>
+
+          {isDirectScanMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={handleExportSingleChecklistExcel}
+                className="btn-outline"
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#059669',
+                  color: '#065F46',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Download size={14} />
+                <span>Download Report (.xlsx)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigate('photo-remarks')}
+                className="btn-outline"
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#059669',
+                  color: '#065F46',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Camera size={14} />
+                <span>Add Defect Photos / Remarks</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  setSaveSuccessNotice('');
+                }}
+                className="btn-outline"
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#D1D5DB',
+                  color: '#374151'
+                }}
+              >
+                Dismiss Notice
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -24,7 +24,6 @@ export default function QRStickerCard({
   // Style 1 = Heavy-Duty Industrial Badge (Vertical, Dark accents)
   // Style 2 = Compact Modern Light Tag (Side-by-side, Pastel Rose accents)
   const [stickerStyle, setStickerStyle] = useState('style1');
-  const [qrPayloadMode, setQrPayloadMode] = useState('url'); // 'url' | 'raw'
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [copiedNotice, setCopiedNotice] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -43,25 +42,33 @@ export default function QRStickerCard({
 
   // Direct Mobile Checklist URL (opens the digital checklist directly when scanned by any smartphone camera)
   const getDirectChecklistUrl = () => {
+    const params = new URLSearchParams();
+    params.set('scan', posId);
+    if (formId) params.set('tmpl', formId);
+    if (equipmentDesc) params.set('eq', equipmentDesc);
+    if (locationDesc) params.set('loc', locationDesc);
+    if (clientName) params.set('client', clientName);
+    if (serialNo) params.set('sn', serialNo);
+
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
       // If deployed on github.io or custom domain
       if (window.location.hostname.includes('github.io')) {
         const pathname = window.location.pathname.replace(/\/+$/, '');
-        return `${origin}${pathname}/?scan=${encodeURIComponent(posId)}`;
+        return `${origin}${pathname}/?${params.toString()}`;
       }
       // If running on localhost, default to GitHub Pages URL so smartphone camera can open it over mobile internet!
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `https://riyazrthd.github.io/M-M/?scan=${encodeURIComponent(posId)}`;
+        return `https://riyazrthd.github.io/M-M/?${params.toString()}`;
       }
-      return `${origin}${window.location.pathname}?scan=${encodeURIComponent(posId)}`;
+      return `${origin}${window.location.pathname}?${params.toString()}`;
     }
-    return `https://riyazrthd.github.io/M-M/?scan=${encodeURIComponent(posId)}`;
+    return `https://riyazrthd.github.io/M-M/?${params.toString()}`;
   };
 
-  const activeQRPayload = qrPayloadMode === 'url' ? getDirectChecklistUrl() : qrCodeText;
+  const activeQRPayload = getDirectChecklistUrl();
 
-  // Generate crimson-red QR code matching both reference specifications
+  // Generate crimson-red QR code with High Error Correction
   useEffect(() => {
     if (activeQRPayload) {
       QRCode.toDataURL(activeQRPayload, {
@@ -71,7 +78,7 @@ export default function QRStickerCard({
           dark: '#A80018', // Official Indus Crimson Red
           light: '#FFFFFF'
         },
-        errorCorrectionLevel: 'M' // Enables center flame badge and clean scan
+        errorCorrectionLevel: 'H' // High error tolerance: 30% recovery for fast phone camera decoding
       })
       .then(url => setQrDataUrl(url))
       .catch(err => console.error('QR Generation Error:', err));
@@ -606,10 +613,10 @@ export default function QRStickerCard({
     }
   };
 
-  // Copy raw QR payload
+  // Copy direct QR deep-link URL
   const handleCopyCode = () => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(qrCodeText);
+      navigator.clipboard.writeText(activeQRPayload);
       setCopiedNotice(true);
       setTimeout(() => setCopiedNotice(false), 2500);
     }
@@ -656,45 +663,72 @@ export default function QRStickerCard({
         </span>
       </div>
 
-      {/* Smartphone Direct Scan Notice */}
+      {/* Smartphone Direct Scan Banner */}
       <div style={{
         width: '100%',
         maxWidth: '560px',
-        padding: '10px 14px',
+        padding: '12px 16px',
         backgroundColor: '#F0F9FF',
         border: '1px solid #BAE6FD',
-        borderRadius: '8px',
+        borderRadius: '10px',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '8px',
-        fontSize: '12.5px',
-        color: '#0369A1'
+        flexDirection: 'column',
+        gap: '8px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Smartphone size={16} color="#0284C7" />
-          <span>
-            <strong>Mobile Scan Link:</strong> Scanning with any phone camera directly opens Checklist <strong>{formId}</strong>.
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0369A1' }}>
+            <Smartphone size={17} color="#0284C7" />
+            <span>Direct Mobile Checklist Link Active</span>
+          </div>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#0284C7', backgroundColor: '#E0F2FE', padding: '2px 8px', borderRadius: '4px' }}>
+            Bypasses All Dashboards
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setQrPayloadMode(qrPayloadMode === 'url' ? 'raw' : 'url')}
-          style={{
-            padding: '3px 8px',
-            fontSize: '11px',
-            borderRadius: '4px',
-            border: '1px solid #BAE6FD',
-            backgroundColor: '#FFFFFF',
-            color: '#0369A1',
-            cursor: 'pointer',
-            fontWeight: 500
-          }}
-          title="Toggle between deep-link URL (opens checklist) or plain text code"
-        >
-          {qrPayloadMode === 'url' ? 'Direct Link (Opens Checklist) ✓' : 'Plain ID Only'}
-        </button>
+        <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.4 }}>
+          Scanning this QR tag with any iPhone or Android camera opens <strong>{formId}</strong> directly for asset <strong>{posId}</strong> with no dashboard or sidebar distraction.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+          <a
+            href={activeQRPayload}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              backgroundColor: '#0284C7',
+              color: '#FFFFFF',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              textDecoration: 'none'
+            }}
+          >
+            <span>Test Direct Mobile Link</span>
+            <ExternalLink size={13} />
+          </a>
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            style={{
+              padding: '6px 12px',
+              fontSize: '12px',
+              borderRadius: '6px',
+              border: '1px solid #BAE6FD',
+              backgroundColor: '#FFFFFF',
+              color: '#0369A1',
+              cursor: 'pointer',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {copiedNotice ? <Check size={13} color="#00875A" /> : <Copy size={13} />}
+            <span>{copiedNotice ? 'Link Copied' : 'Copy Direct Link'}</span>
+          </button>
+        </div>
       </div>
 
       {/* ====================================================================

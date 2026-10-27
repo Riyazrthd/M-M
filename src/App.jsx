@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Flame, CheckCircle2 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DemoNoticeBanner from './components/DemoNoticeBanner';
@@ -7,7 +8,7 @@ import CommandPaletteModal from './components/CommandPaletteModal';
 import TemplateMappingsModal from './components/TemplateMappingsModal';
 import EquipmentMasterModal from './components/EquipmentMasterModal';
 import SupabaseBackupModal from './components/SupabaseBackupModal';
-import { autoSyncToSupabase } from './services/supabaseBackup';
+import { autoSyncToSupabase, fetchPositionFromSupabase } from './services/supabaseBackup';
 
 import LoginScreen from './screens/LoginScreen';
 import SiteListScreen from './screens/SiteListScreen';
@@ -20,12 +21,47 @@ import ManagerDashboardScreen from './screens/ManagerDashboardScreen';
 import ClientPortalScreen from './screens/ClientPortalScreen';
 import AssetRegisterScreen from './screens/AssetRegisterScreen';
 
-import { initStorage, getCurrentUser, getSites, getPositions, getPositionByQR } from './data/storage';
+import { 
+  initStorage, 
+  getCurrentUser, 
+  getSites, 
+  getPositions, 
+  getPositionByQR, 
+  resolveScannedAssetPosition 
+} from './data/storage';
+
+// Synchronously detect if launched directly via scanned QR code URL
+const detectInitialScanState = () => {
+  if (typeof window === 'undefined') return { isDirectScan: false, scanCode: null, position: null, site: null };
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const scanCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id');
+    if (scanCode) {
+      initStorage();
+      const pos = resolveScannedAssetPosition(scanCode, urlParams);
+      const sites = getSites();
+      const site = pos ? (sites.find(s => s.id === pos.siteId) || sites[0]) : (sites[0] || null);
+      return {
+        isDirectScan: true,
+        scanCode,
+        position: pos,
+        site: site
+      };
+    }
+  } catch (e) {
+    console.warn('Initial scan detection error:', e);
+  }
+  return { isDirectScan: false, scanCode: null, position: null, site: null };
+};
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('manager-dashboard');
-  const [activeSite, setActiveSite] = useState(null);
-  const [activePosition, setActivePosition] = useState(null);
+  const initialScan = useMemo(() => detectInitialScanState(), []);
+
+  // Direct scan mode flag: when true, hides sidebar, topbar, demo banners, and bottom navigation
+  const [isDirectScanMode, setIsDirectScanMode] = useState(initialScan.isDirectScan);
+  const [currentScreen, setCurrentScreen] = useState(initialScan.isDirectScan ? 'digital-checklist' : 'manager-dashboard');
+  const [activeSite, setActiveSite] = useState(initialScan.site || null);
+  const [activePosition, setActivePosition] = useState(initialScan.position || null);
   const [currentUser, setCurrentUserState] = useState(getCurrentUser());
 
   // Layout UI state
@@ -39,29 +75,21 @@ export default function App() {
   useEffect(() => {
     initStorage();
     const sites = getSites();
-    if (sites.length > 0) {
+    if (sites.length > 0 && !activeSite) {
       setActiveSite(sites[0]);
     }
     const positions = getPositions();
-    if (positions.length > 0) {
+    if (positions.length > 0 && !activePosition) {
       setActivePosition(positions[0]);
     }
 
-    // Auto-launch Checklist if opened via scanned QR code URL (e.g. ?scan=IFS-POS-000108)
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const scanCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id');
-      if (scanCode) {
-        const matched = getPositionByQR(scanCode);
-        if (matched) {
-          setActivePosition(matched);
-          const matchedSite = sites.find(s => s.id === matched.siteId);
-          if (matchedSite) setActiveSite(matchedSite);
-          setCurrentScreen('digital-checklist');
+    // If direct scan mode is active, try to hydrate from Supabase in the background if needed
+    if (initialScan.isDirectScan && initialScan.scanCode) {
+      fetchPositionFromSupabase(initialScan.scanCode).then(cloudPos => {
+        if (cloudPos) {
+          setActivePosition(cloudPos);
         }
-      }
-    } catch (e) {
-      console.warn('URL QR scan error:', e);
+      });
     }
 
     const handleUserChange = (e) => {
@@ -114,6 +142,226 @@ export default function App() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA' }}>
         <LoginScreen onNavigate={navigateTo} />
+      </div>
+    );
+  }
+
+  // DIRECT SCAN MODE: Field Inspection ONLY (Zero dashboard, zero sidebar, zero distractions)
+  if (isDirectScanMode) {
+    const pos = activePosition || getPositions()[0];
+    const tmplId = pos?.templateId || 'CL-11';
+    const clientTitle = activeSite?.clientName || activeSite?.name || pos?.clientName || 'Client Organisation';
+    const equipmentLabel = pos?.equipmentType || pos?.currentEquipment?.type || 'Fire Safety Equipment';
+    const locationLabel = pos?.area ? `${pos.area} — ${pos.location}` : (pos?.location || 'Plant Floor');
+
+    return (
+      <div className="direct-scan-shell" style={{
+        minHeight: '100vh',
+        backgroundColor: '#F8F9FA',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Indus Brand Direct Inspection Header */}
+        <header style={{
+          backgroundColor: '#111827',
+          color: '#FFFFFF',
+          padding: '12px 18px',
+          borderBottom: '3px solid #A80018',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        }}>
+          <div style={{
+            maxWidth: '960px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
+                backgroundColor: '#A80018',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                boxShadow: '0 2px 4px rgba(168,0,24,0.3)'
+              }}>
+                <Flame size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#FFFFFF' }}>
+                  INDUS FIRE SAFETY
+                </div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF', letterSpacing: '0.02em' }}>
+                  Digital AMC Field Inspection • SOP {tmplId}
+                </div>
+              </div>
+            </div>
+
+            {/* Position ID & Status Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                fontWeight: 700,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                color: '#FFFFFF',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}>
+                {pos?.positionId || 'ASSET'}
+              </span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                backgroundColor: '#00875A',
+                color: '#FFFFFF',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <CheckCircle2 size={12} />
+                Live Checklist
+              </span>
+            </div>
+          </div>
+        </header>
+
+        {/* Asset Context Strip */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #E1E5E9',
+          padding: '12px 18px'
+        }}>
+          <div style={{
+            maxWidth: '960px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div>
+              <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#111827' }}>
+                {equipmentLabel}
+              </div>
+              <div style={{ fontSize: '12px', color: '#536174', marginTop: '2px' }}>
+                <strong>{clientTitle}</strong> • {locationLabel}
+              </div>
+            </div>
+            <div style={{ fontSize: '12px', color: '#536174' }}>
+              Serial No: <strong style={{ color: '#111827' }}>{pos?.currentEquipment?.serialNo || pos?.serialNumber || 'N/A'}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Inspection Body */}
+        <main style={{ flex: 1, padding: '18px 14px', maxWidth: '960px', width: '100%', margin: '0 auto' }}>
+          {currentScreen === 'digital-checklist' && (
+            <DigitalChecklistScreen
+              position={pos}
+              activeSite={activeSite}
+              onNavigate={(nextScreen) => {
+                if (nextScreen === 'photo-remarks') {
+                  setCurrentScreen('photo-remarks');
+                } else if (nextScreen === 'asset-details') {
+                  setCurrentScreen('asset-details');
+                } else {
+                  setCurrentScreen(nextScreen);
+                }
+              }}
+              isDirectScanMode={true}
+            />
+          )}
+
+          {currentScreen === 'photo-remarks' && (
+            <PhotoRemarksScreen
+              activeSite={activeSite}
+              onNavigate={(nextScreen) => {
+                if (nextScreen === 'digital-checklist') {
+                  setCurrentScreen('digital-checklist');
+                } else {
+                  setCurrentScreen(nextScreen);
+                }
+              }}
+              isDirectScanMode={true}
+            />
+          )}
+
+          {currentScreen === 'asset-details' && (
+            <div>
+              <button
+                onClick={() => setCurrentScreen('digital-checklist')}
+                className="btn-outline"
+                style={{ marginBottom: '14px', height: '36px', padding: '0 12px', fontSize: '13px' }}
+              >
+                ← Return to Inspection Checklist
+              </button>
+              <AssetDetailsScreen
+                position={pos}
+                onNavigate={(nextScreen) => setCurrentScreen(nextScreen)}
+                onUpdatePosition={handleSelectPosition}
+                isDirectScanMode={true}
+              />
+            </div>
+          )}
+        </main>
+
+        {/* Discreet Footer with option to exit direct scan and open manager portal */}
+        <footer style={{
+          backgroundColor: '#FFFFFF',
+          borderTop: '1px solid #E1E5E9',
+          padding: '14px 18px',
+          textAlign: 'center',
+          marginTop: 'auto'
+        }}>
+          <div style={{
+            maxWidth: '960px',
+            margin: '0 auto',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '11.5px', color: '#6B7280' }}>
+              Indus Fire Safety Private Limited • Dedicated Digital Field Inspection
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDirectScanMode(false);
+                setCurrentScreen('manager-dashboard');
+                if (typeof window !== 'undefined' && window.history && window.history.pushState) {
+                  const cleanUrl = window.location.pathname;
+                  window.history.pushState({}, '', cleanUrl);
+                }
+              }}
+              style={{
+                fontSize: '11.5px',
+                color: '#4B5563',
+                backgroundColor: 'transparent',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                padding: '5px 12px',
+                cursor: 'pointer'
+              }}
+            >
+              Open Full Manager Portal →
+            </button>
+          </div>
+        </footer>
       </div>
     );
   }

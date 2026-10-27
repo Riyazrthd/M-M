@@ -955,3 +955,70 @@ export async function pullDataFromSupabase(url, anonKey) {
     };
   }
 }
+
+/**
+ * Fetch a specific position on-demand from Supabase by position_id or qr_code
+ * Used when a mobile phone scans a QR code generated on another device
+ */
+export async function fetchPositionFromSupabase(queryCode) {
+  if (!queryCode || typeof queryCode !== 'string') return null;
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey) return null;
+
+  const cleanUrl = config.url.trim().replace(/\/+$/, '');
+  const cleanKey = config.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    const clean = encodeURIComponent(queryCode.trim());
+    const res = await fetch(`${cleanUrl}/rest/v1/positions?or=(position_id.eq.${clean},qr_code.eq.${clean},id.eq.${clean})&select=*`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const p = data[0];
+        const transformed = {
+          id: p.id,
+          positionId: p.position_id || p.id,
+          qrCode: p.qr_code,
+          qrToken: p.qr_code,
+          siteId: p.site_id,
+          area: p.area,
+          location: p.location,
+          equipmentCategory: p.equipment_category,
+          equipmentType: p.equipment_type,
+          capacity: p.capacity,
+          serviceType: p.service_type,
+          templateId: p.template_id,
+          currentEquipmentId: p.current_equipment_id,
+          currentEquipment: p.current_equipment,
+          applicableChecklistMapping: p.applicable_checklist_mapping,
+          inspectionStatus: p.inspection_status || 'Active in Position',
+          lastInspectionDate: p.last_inspection_date,
+          history: p.history || []
+        };
+        // Cache into local positions
+        try {
+          const raw = localStorage.getItem('ifspl_amc_positions');
+          const localPositions = raw ? JSON.parse(raw) : [];
+          const idx = localPositions.findIndex(lp => lp.positionId === transformed.positionId || lp.id === transformed.id);
+          if (idx >= 0) {
+            localPositions[idx] = transformed;
+          } else {
+            localPositions.push(transformed);
+          }
+          localStorage.setItem('ifspl_amc_positions', JSON.stringify(localPositions));
+        } catch (e) {}
+
+        return transformed;
+      }
+    }
+  } catch (err) {
+    console.warn('fetchPositionFromSupabase error:', err);
+  }
+  return null;
+}
+

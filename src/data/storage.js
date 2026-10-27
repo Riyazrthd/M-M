@@ -321,6 +321,76 @@ export function getPositionByQR(qrCode) {
   }) || null;
 }
 
+/**
+ * Resolve asset position for QR scan with query param fallback
+ * Handles cross-device scans (e.g. registered on PC, scanned on mobile)
+ */
+export function resolveScannedAssetPosition(scanCode, urlParams = null) {
+  if (!scanCode) return null;
+  const match = getPositionByQR(scanCode);
+  if (match) return match;
+
+  try {
+    const params = urlParams || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null);
+    if (params) {
+      const tmpl = params.get('tmpl') || 'CL-11';
+      const eq = params.get('eq') || 'Fire Safety Equipment';
+      const client = params.get('client') || 'Client Organisation';
+      const loc = params.get('loc') || 'Plant Area';
+      const sn = params.get('sn') || scanCode;
+      const cap = params.get('cap') || '';
+
+      const constructed = {
+        id: `pos-${scanCode.toLowerCase()}`,
+        positionId: scanCode,
+        permanentPositionCode: scanCode,
+        qrCode: scanCode.startsWith('IFS-QR-') ? scanCode : `IFS-QR-${scanCode}`,
+        qrToken: scanCode.startsWith('IFS-QR-') ? scanCode : `IFS-QR-${scanCode}`,
+        siteId: 'SITE-AIL-001',
+        siteName: client,
+        clientName: client,
+        area: loc.split('—')[0]?.trim() || loc,
+        location: loc.split('—')[1]?.trim() || loc,
+        equipmentCategory: 'Fire Extinguisher',
+        equipmentType: eq,
+        serviceType: 'Digital Inspection & Maintenance',
+        templateId: tmpl,
+        currentEquipmentId: sn,
+        activeUnitId: sn,
+        currentEquipment: {
+          id: sn,
+          assetPositionId: scanCode,
+          serialNo: sn,
+          serialNumber: sn,
+          make: 'Indus SafeGuard',
+          capacity: cap || 'Standard',
+          type: eq,
+          operationalStatus: 'Active in Position'
+        },
+        applicableChecklistMapping: {
+          templateId: tmpl
+        },
+        inspectionStatus: 'Pending Initial Inspection',
+        lastInspectionDate: null,
+        history: []
+      };
+
+      const positions = getPositions();
+      const exists = positions.find(p => p.positionId === scanCode);
+      if (!exists) {
+        positions.push(constructed);
+        localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
+      }
+      return constructed;
+    }
+  } catch (e) {
+    console.warn('resolveScannedAssetPosition error:', e);
+  }
+
+  return null;
+}
+
+
 // Equipment replacement at a permanent position
 // Enforces Requirement 9: QR code of position remains unchanged; cylinder histories tracked separately!
 export function replaceEquipmentAtPosition(positionId, replacementData) {

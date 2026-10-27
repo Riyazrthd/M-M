@@ -3,16 +3,25 @@ import fs from 'fs';
 import path from 'path';
 
 console.log('Building production bundle...');
-execSync('npm run build', { stdio: 'inherit' });
+execSync('node node_modules/vite/bin/vite.js build', { stdio: 'inherit' });
 
 const distPath = path.resolve('dist');
+const docsPath = path.resolve('docs');
+
+// Sync to docs/ directory for main branch GitHub Pages deployment option
+console.log('Copying production bundle to docs folder...');
+if (fs.existsSync(docsPath)) {
+  fs.rmSync(docsPath, { recursive: true, force: true });
+}
+fs.cpSync(distPath, docsPath, { recursive: true });
+
 console.log('Deploying dist folder to gh-pages branch...');
 
 try {
   execSync('git init', { cwd: distPath, stdio: 'ignore' });
   execSync('git checkout -B gh-pages', { cwd: distPath, stdio: 'ignore' });
   execSync('git add -A', { cwd: distPath, stdio: 'ignore' });
-  execSync('git commit -m "Deploy to GitHub Pages"', { cwd: distPath, stdio: 'ignore' });
+  execSync('git commit -m "Deploy direct scan checklist & Supabase sync update"', { cwd: distPath, stdio: 'ignore' });
   execSync('git remote add origin https://github.com/Riyazrthd/M-M.git', { cwd: distPath, stdio: 'ignore' });
   execSync('git push origin gh-pages --force', { cwd: distPath, stdio: 'inherit' });
   console.log('✓ Successfully pushed compiled bundle to gh-pages branch!');
@@ -24,3 +33,4 @@ try {
     fs.rmSync(gitDir, { recursive: true, force: true });
   }
 }
+
