@@ -10,7 +10,10 @@ import {
   Flame,
   Check,
   Sparkles,
-  Layers
+  Layers,
+  ClipboardCheck,
+  Smartphone,
+  ExternalLink
 } from 'lucide-react';
 
 export default function QRStickerCard({
@@ -21,6 +24,7 @@ export default function QRStickerCard({
   // Style 1 = Heavy-Duty Industrial Badge (Vertical, Dark accents)
   // Style 2 = Compact Modern Light Tag (Side-by-side, Pastel Rose accents)
   const [stickerStyle, setStickerStyle] = useState('style1');
+  const [qrPayloadMode, setQrPayloadMode] = useState('url'); // 'url' | 'raw'
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [copiedNotice, setCopiedNotice] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -37,22 +41,42 @@ export default function QRStickerCard({
   const serialNo = position?.currentEquipment?.serialNo || position?.currentEquipment?.serialNumber || position?.serialNumber || 'IFS-2024-2218';
   const formId = position?.templateId || 'CL-11';
 
+  // Direct Mobile Checklist URL (opens the digital checklist directly when scanned by any smartphone camera)
+  const getDirectChecklistUrl = () => {
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      // If deployed on github.io or custom domain
+      if (window.location.hostname.includes('github.io')) {
+        const pathname = window.location.pathname.replace(/\/+$/, '');
+        return `${origin}${pathname}/?scan=${encodeURIComponent(posId)}`;
+      }
+      // If running on localhost, default to GitHub Pages URL so smartphone camera can open it over mobile internet!
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `https://riyazrthd.github.io/M-M/?scan=${encodeURIComponent(posId)}`;
+      }
+      return `${origin}${window.location.pathname}?scan=${encodeURIComponent(posId)}`;
+    }
+    return `https://riyazrthd.github.io/M-M/?scan=${encodeURIComponent(posId)}`;
+  };
+
+  const activeQRPayload = qrPayloadMode === 'url' ? getDirectChecklistUrl() : qrCodeText;
+
   // Generate crimson-red QR code matching both reference specifications
   useEffect(() => {
-    if (qrCodeText) {
-      QRCode.toDataURL(qrCodeText, {
+    if (activeQRPayload) {
+      QRCode.toDataURL(activeQRPayload, {
         width: 360,
         margin: 1,
         color: {
           dark: '#A80018', // Official Indus Crimson Red
           light: '#FFFFFF'
         },
-        errorCorrectionLevel: 'H' // High error tolerance enables center flame badge
+        errorCorrectionLevel: 'M' // Enables center flame badge and clean scan
       })
       .then(url => setQrDataUrl(url))
       .catch(err => console.error('QR Generation Error:', err));
     }
-  }, [qrCodeText]);
+  }, [activeQRPayload]);
 
   // Handle standard browser/OS print
   const handlePrint = () => {
@@ -630,6 +654,47 @@ export default function QRStickerCard({
         }}>
           QR Generated
         </span>
+      </div>
+
+      {/* Smartphone Direct Scan Notice */}
+      <div style={{
+        width: '100%',
+        maxWidth: '560px',
+        padding: '10px 14px',
+        backgroundColor: '#F0F9FF',
+        border: '1px solid #BAE6FD',
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+        fontSize: '12.5px',
+        color: '#0369A1'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Smartphone size={16} color="#0284C7" />
+          <span>
+            <strong>Mobile Scan Link:</strong> Scanning with any phone camera directly opens Checklist <strong>{formId}</strong>.
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setQrPayloadMode(qrPayloadMode === 'url' ? 'raw' : 'url')}
+          style={{
+            padding: '3px 8px',
+            fontSize: '11px',
+            borderRadius: '4px',
+            border: '1px solid #BAE6FD',
+            backgroundColor: '#FFFFFF',
+            color: '#0369A1',
+            cursor: 'pointer',
+            fontWeight: 500
+          }}
+          title="Toggle between deep-link URL (opens checklist) or plain text code"
+        >
+          {qrPayloadMode === 'url' ? 'Direct Link (Opens Checklist) ✓' : 'Plain ID Only'}
+        </button>
       </div>
 
       {/* ====================================================================
@@ -1315,63 +1380,97 @@ export default function QRStickerCard({
         </div>
       )}
 
-      {/* Action Buttons: Print, High-Res PNG Download & Copy Code */}
+      {/* Action Buttons: Launch Checklist, Print, High-Res PNG Download & Copy Code */}
       <div style={{
         display: 'flex',
+        flexDirection: 'column',
         gap: '10px',
-        flexWrap: 'wrap',
         width: '100%',
-        maxWidth: '480px',
-        justifyContent: 'center'
+        maxWidth: '480px'
       }}>
-        <button
-          onClick={handlePrint}
-          className="btn-primary"
-          style={{
-            flex: 1,
-            minWidth: '140px',
-            height: '42px',
-            fontSize: '13.5px',
-            fontWeight: 600
-          }}
-          title="Print official vinyl / paper QR sticker tag"
-        >
-          <Printer size={16} />
-          <span>Print Sticker</span>
-        </button>
+        {/* Direct Open Checklist Button */}
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('digital-checklist')}
+            style={{
+              width: '100%',
+              height: '44px',
+              borderRadius: '8px',
+              backgroundColor: '#00875A',
+              color: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 600,
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0, 135, 90, 0.2)'
+            }}
+            title={`Directly open and fill digital checklist ${formId} for this equipment`}
+          >
+            <ClipboardCheck size={18} />
+            <span>Launch Inspection Checklist ({formId}) →</span>
+          </button>
+        )}
 
-        <button
-          onClick={handleDownloadPNG}
-          disabled={isDownloading}
-          className="btn-outline"
-          style={{
-            flex: 1,
-            minWidth: '140px',
-            height: '42px',
-            fontSize: '13.5px',
-            fontWeight: 600,
-            borderColor: '#A80018',
-            color: '#A80018'
-          }}
-          title="Download complete high-res printable tag PNG"
-        >
-          <Download size={16} />
-          <span>{isDownloading ? 'Generating...' : 'Download Tag PNG'}</span>
-        </button>
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          flexWrap: 'wrap',
+          width: '100%'
+        }}>
+          <button
+            onClick={handlePrint}
+            className="btn-primary"
+            style={{
+              flex: 1,
+              minWidth: '140px',
+              height: '42px',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              backgroundColor: '#111827'
+            }}
+            title="Print official vinyl / paper QR sticker tag"
+          >
+            <Printer size={16} />
+            <span>Print Sticker</span>
+          </button>
 
-        <button
-          onClick={handleCopyCode}
-          className="btn-outline"
-          style={{
-            height: '42px',
-            padding: '0 14px',
-            fontSize: '13px'
-          }}
-          title="Copy QR Identifier code to clipboard"
-        >
-          {copiedNotice ? <Check size={15} color="#00875A" /> : <Copy size={15} />}
-          <span>{copiedNotice ? 'Copied' : 'Copy Code'}</span>
-        </button>
+          <button
+            onClick={handleDownloadPNG}
+            disabled={isDownloading}
+            className="btn-outline"
+            style={{
+              flex: 1,
+              minWidth: '140px',
+              height: '42px',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              borderColor: '#A80018',
+              color: '#A80018'
+            }}
+            title="Download complete high-res printable tag PNG"
+          >
+            <Download size={16} />
+            <span>{isDownloading ? 'Generating...' : 'Download Tag PNG'}</span>
+          </button>
+
+          <button
+            onClick={handleCopyCode}
+            className="btn-outline"
+            style={{
+              height: '42px',
+              padding: '0 14px',
+              fontSize: '13px'
+            }}
+            title="Copy QR Identifier link / code to clipboard"
+          >
+            {copiedNotice ? <Check size={15} color="#00875A" /> : <Copy size={15} />}
+            <span>{copiedNotice ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Post-Registration Navigation Options */}

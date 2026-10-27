@@ -112,6 +112,8 @@ export default function QRScannerScreen({ onNavigate, onSelectPosition, activeSi
       if (onSelectPosition) {
         onSelectPosition(match);
       }
+      // Direct opening of the mapped digital checklist
+      onNavigate('digital-checklist');
     } else {
       setScanError(`Asset not found: No equipment position registered for code "${code}".`);
       setUnknownCode(code);

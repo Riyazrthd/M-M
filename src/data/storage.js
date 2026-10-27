@@ -279,13 +279,46 @@ export function getPositionById(positionId) {
 }
 
 export function getPositionByQR(qrCode) {
+  if (!qrCode || typeof qrCode !== 'string') return null;
   const positions = getPositions();
-  const cleanCode = qrCode.trim().toUpperCase();
-  return positions.find(p => 
-    p.qrCode.toUpperCase() === cleanCode || 
-    p.positionId.toUpperCase() === cleanCode ||
-    (p.currentEquipment && p.currentEquipment.serialNo.toUpperCase() === cleanCode)
-  ) || null;
+  
+  let cleanCode = qrCode.trim();
+  // Extract token if a full URL or query string was scanned
+  try {
+    if (cleanCode.includes('?') || cleanCode.includes('&')) {
+      const queryPart = cleanCode.split('?')[1] || cleanCode;
+      const params = new URLSearchParams(queryPart);
+      cleanCode = params.get('scan') || params.get('pos') || params.get('id') || params.get('qr') || cleanCode;
+    }
+    if (cleanCode.includes('#')) {
+      cleanCode = cleanCode.split('#')[1] || cleanCode;
+    }
+    if (cleanCode.includes('/') && (cleanCode.startsWith('http://') || cleanCode.startsWith('https://'))) {
+      const parts = cleanCode.split('/').filter(Boolean);
+      const lastPart = parts[parts.length - 1];
+      if (lastPart && !lastPart.includes('.')) {
+        cleanCode = lastPart;
+      }
+    }
+  } catch (e) {}
+
+  const cleanUpper = cleanCode.trim().toUpperCase();
+
+  return positions.find(p => {
+    const pQr = (p.qrCode || '').toUpperCase();
+    const pPosId = (p.positionId || '').toUpperCase();
+    const pId = (p.id || '').toUpperCase();
+    const pSerial = (p.currentEquipment?.serialNo || p.currentEquipment?.serialNumber || '').toUpperCase();
+    const pUnitId = (p.currentEquipment?.id || '').toUpperCase();
+
+    return pQr === cleanUpper || 
+           pPosId === cleanUpper || 
+           pId === cleanUpper || 
+           pSerial === cleanUpper ||
+           pUnitId === cleanUpper ||
+           (cleanUpper.length > 6 && pQr.includes(cleanUpper)) ||
+           (cleanUpper.length > 6 && cleanUpper.includes(pQr));
+  }) || null;
 }
 
 // Equipment replacement at a permanent position

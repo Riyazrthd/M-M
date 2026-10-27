@@ -20,7 +20,7 @@ import ManagerDashboardScreen from './screens/ManagerDashboardScreen';
 import ClientPortalScreen from './screens/ClientPortalScreen';
 import AssetRegisterScreen from './screens/AssetRegisterScreen';
 
-import { initStorage, getCurrentUser, getSites, getPositions } from './data/storage';
+import { initStorage, getCurrentUser, getSites, getPositions, getPositionByQR } from './data/storage';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('manager-dashboard');
@@ -45,6 +45,23 @@ export default function App() {
     const positions = getPositions();
     if (positions.length > 0) {
       setActivePosition(positions[0]);
+    }
+
+    // Auto-launch Checklist if opened via scanned QR code URL (e.g. ?scan=IFS-POS-000108)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const scanCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id');
+      if (scanCode) {
+        const matched = getPositionByQR(scanCode);
+        if (matched) {
+          setActivePosition(matched);
+          const matchedSite = sites.find(s => s.id === matched.siteId);
+          if (matchedSite) setActiveSite(matchedSite);
+          setCurrentScreen('digital-checklist');
+        }
+      }
+    } catch (e) {
+      console.warn('URL QR scan error:', e);
     }
 
     const handleUserChange = (e) => {
