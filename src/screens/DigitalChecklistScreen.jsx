@@ -126,6 +126,16 @@ export default function DigitalChecklistScreen({
     setSaveSuccessNotice('');
   }, [selectedTemplateId]);
 
+  // Synchronize immediately when position prop is scanned or resolved
+  useEffect(() => {
+    if (position) {
+      setActiveAsset(position);
+      if (position.templateId && position.templateId !== selectedTemplateId) {
+        setSelectedTemplateId(position.templateId);
+      }
+    }
+  }, [position]);
+
   // Handle technician selection
   const handleSelectTechnician = (techId) => {
     setValidationError('');
@@ -245,6 +255,9 @@ export default function DigitalChecklistScreen({
 
     if (matched) {
       setActiveAsset(matched);
+      if (matched.templateId && matched.templateId !== selectedTemplateId) {
+        setSelectedTemplateId(matched.templateId);
+      }
       setActiveAnswers({});
       setActiveRemarks('');
       setActivePhotos([]);
@@ -438,42 +451,15 @@ export default function DigitalChecklistScreen({
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => onNavigate('site-list')}
-            className="btn-outline"
-            style={{ height: '36px', minHeight: '36px', padding: '0 12px', fontSize: '0.82rem' }}
-          >
-            <ChevronLeft size={16} /> Sites List
-          </button>
-
-          {/* Checklist Master Template Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-              Checklist:
-            </span>
-            <select
-              value={selectedTemplateId}
-              onChange={(e) => setSelectedTemplateId(e.target.value)}
-              style={{
-                height: '36px',
-                minHeight: '36px',
-                padding: '0 10px',
-                borderRadius: '6px',
-                backgroundColor: '#FFFFFF',
-                border: '1.5px solid #0F172A',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: '#0F172A',
-                cursor: 'pointer'
-              }}
+          {!isDirectScanMode && (
+            <button
+              onClick={() => onNavigate('site-list')}
+              className="btn-outline"
+              style={{ height: '36px', minHeight: '36px', padding: '0 12px', fontSize: '0.82rem' }}
             >
-              {CHECKLIST_INDEX.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.id} — {item.title} ({item.itemsCount} items)
-                </option>
-              ))}
-            </select>
-          </div>
+              <ChevronLeft size={16} /> Sites List
+            </button>
+          )}
 
           {/* Status Badge */}
           <span style={{
@@ -487,6 +473,25 @@ export default function DigitalChecklistScreen({
           }}>
             {sessionStatus === 'Completed' ? '✓ Checklist Completed' : '● Inspection In Progress'}
           </span>
+
+          {activeAsset && (
+            <span style={{
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#0F172A',
+              backgroundColor: '#EFF6FF',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              border: '1px solid #BFDBFE',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <QrCode size={14} color="#2563EB" />
+              <span>Scanned Asset: <strong style={{ fontFamily: 'monospace' }}>{activeAsset.positionId}</strong></span>
+              <span style={{ color: '#475569', fontWeight: 600 }}>({template.id} • {template.sopNo})</span>
+            </span>
+          )}
         </div>
 
         {/* Master Excel & CSV Export Buttons */}

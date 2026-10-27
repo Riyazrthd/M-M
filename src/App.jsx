@@ -149,125 +149,16 @@ export default function App() {
   // DIRECT SCAN MODE: Field Inspection ONLY (Zero dashboard, zero sidebar, zero distractions)
   if (isDirectScanMode) {
     const pos = activePosition || getPositions()[0];
-    const tmplId = pos?.templateId || 'CL-11';
-    const clientTitle = activeSite?.clientName || activeSite?.name || pos?.clientName || 'Client Organisation';
-    const equipmentLabel = pos?.equipmentType || pos?.currentEquipment?.type || 'Fire Safety Equipment';
-    const locationLabel = pos?.area ? `${pos.area} — ${pos.location}` : (pos?.location || 'Plant Floor');
 
     return (
       <div className="direct-scan-shell" style={{
         minHeight: '100vh',
-        backgroundColor: '#F8F9FA',
-        display: 'flex',
-        flexDirection: 'column'
+        backgroundColor: '#F8FAFC',
+        padding: '12px',
+        width: '100%'
       }}>
-        {/* Indus Brand Direct Inspection Header */}
-        <header style={{
-          backgroundColor: '#111827',
-          color: '#FFFFFF',
-          padding: '12px 18px',
-          borderBottom: '3px solid #A80018',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-        }}>
-          <div style={{
-            maxWidth: '960px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '8px',
-                backgroundColor: '#A80018',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-                boxShadow: '0 2px 4px rgba(168,0,24,0.3)'
-              }}>
-                <Flame size={20} />
-              </div>
-              <div>
-                <div style={{ fontSize: '13.5px', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#FFFFFF' }}>
-                  INDUS FIRE SAFETY
-                </div>
-                <div style={{ fontSize: '11px', color: '#9CA3AF', letterSpacing: '0.02em' }}>
-                  Digital AMC Field Inspection • SOP {tmplId}
-                </div>
-              </div>
-            </div>
-
-            {/* Position ID & Status Pill */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                fontWeight: 700,
-                backgroundColor: 'rgba(255,255,255,0.12)',
-                color: '#FFFFFF',
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.2)'
-              }}>
-                {pos?.positionId || 'ASSET'}
-              </span>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                backgroundColor: '#00875A',
-                color: '#FFFFFF',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <CheckCircle2 size={12} />
-                Live Checklist
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* Asset Context Strip */}
-        <div style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #E1E5E9',
-          padding: '12px 18px'
-        }}>
-          <div style={{
-            maxWidth: '960px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '10px'
-          }}>
-            <div>
-              <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#111827' }}>
-                {equipmentLabel}
-              </div>
-              <div style={{ fontSize: '12px', color: '#536174', marginTop: '2px' }}>
-                <strong>{clientTitle}</strong> • {locationLabel}
-              </div>
-            </div>
-            <div style={{ fontSize: '12px', color: '#536174' }}>
-              Serial No: <strong style={{ color: '#111827' }}>{pos?.currentEquipment?.serialNo || pos?.serialNumber || 'N/A'}</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Inspection Body */}
-        <main style={{ flex: 1, padding: '16px 14px', maxWidth: '1400px', width: '100%', margin: '0 auto' }}>
+        {/* Main Inspection Body - Opens Direct Landscape Checklist */}
+        <main style={{ flex: 1, padding: '0', maxWidth: '100%', width: '100%', margin: '0 auto' }}>
           {currentScreen === 'digital-checklist' && (
             <DigitalChecklistScreen
               position={pos}
