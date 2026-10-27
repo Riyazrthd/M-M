@@ -1099,10 +1099,10 @@ export function submitAssetObservation(visitId, templateId, observationData) {
   const visit = visits[vIndex];
   if (!visit.checklistSessions) visit.checklistSessions = {};
   if (!visit.checklistSessions[templateId]) {
-    getChecklistSession(visitId, templateId);
+    visit.checklistSessions[templateId] = getChecklistSession(visitId, templateId);
   }
 
-  const session = visit.checklistSessions[templateId];
+  const session = visit.checklistSessions[templateId] || getChecklistSession(visitId, templateId);
   const now = new Date();
   const dateFormatted = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeFormatted = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
