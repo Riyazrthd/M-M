@@ -7,6 +7,12 @@ execSync('node node_modules/vite/bin/vite.js build', { stdio: 'inherit' });
 
 const distPath = path.resolve('dist');
 const docsPath = path.resolve('docs');
+const rootAssetsPath = path.resolve('assets');
+
+// Ensure 404.html is in dist
+if (fs.existsSync('404.html')) {
+  fs.copyFileSync('404.html', path.join(distPath, '404.html'));
+}
 
 // Sync to docs/ directory for main branch GitHub Pages deployment option
 console.log('Copying production bundle to docs folder...');
@@ -14,6 +20,13 @@ if (fs.existsSync(docsPath)) {
   fs.rmSync(docsPath, { recursive: true, force: true });
 }
 fs.cpSync(distPath, docsPath, { recursive: true });
+
+// Also copy assets directly into root assets/ so both / and /docs/ have assets
+console.log('Syncing production assets to root assets folder...');
+if (fs.existsSync(rootAssetsPath)) {
+  fs.rmSync(rootAssetsPath, { recursive: true, force: true });
+}
+fs.cpSync(path.join(distPath, 'assets'), rootAssetsPath, { recursive: true });
 
 console.log('Deploying dist folder to gh-pages branch...');
 

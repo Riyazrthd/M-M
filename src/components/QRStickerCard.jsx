@@ -52,18 +52,21 @@ export default function QRStickerCard({
 
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
-      // If deployed on github.io or custom domain
+      // If deployed on github.io
       if (window.location.hostname.includes('github.io')) {
-        const pathname = window.location.pathname.replace(/\/+$/, '');
+        let pathname = window.location.pathname.replace(/\/+$/, '');
+        if (!pathname.includes('/docs')) {
+          pathname += '/docs';
+        }
         return `${origin}${pathname}/?${params.toString()}`;
       }
-      // If running on localhost, default to GitHub Pages URL so smartphone camera can open it over mobile internet!
+      // If running on localhost, default to GitHub Pages /docs/ URL so smartphone camera opens the live form over mobile internet!
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `https://riyazrthd.github.io/M-M/?${params.toString()}`;
+        return `https://riyazrthd.github.io/M-M/docs/?${params.toString()}`;
       }
       return `${origin}${window.location.pathname}?${params.toString()}`;
     }
-    return `https://riyazrthd.github.io/M-M/?${params.toString()}`;
+    return `https://riyazrthd.github.io/M-M/docs/?${params.toString()}`;
   };
 
   const activeQRPayload = getDirectChecklistUrl();

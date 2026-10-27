@@ -42,7 +42,7 @@ export default function LoginScreen({ onNavigate }) {
       {/* Brand Header */}
       <div style={{ textAlign: 'center' }}>
         <img
-          src="/indus_fire_safety_logo.png"
+          src="./indus_fire_safety_logo.png"
           alt="Indus Fire Safety"
           style={{
             height: '72px',
