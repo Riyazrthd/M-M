@@ -14,6 +14,18 @@ if (fs.existsSync('404.html')) {
   fs.copyFileSync('404.html', path.join(distPath, '404.html'));
 }
 
+// Ensure dist also has a docs/ subfolder so any URL pointing to /M-M/docs/ also resolves cleanly
+const distDocsPath = path.join(distPath, 'docs');
+if (fs.existsSync(distDocsPath)) {
+  fs.rmSync(distDocsPath, { recursive: true, force: true });
+}
+fs.mkdirSync(distDocsPath, { recursive: true });
+fs.copyFileSync(path.join(distPath, 'index.html'), path.join(distDocsPath, 'index.html'));
+if (fs.existsSync('404.html')) {
+  fs.copyFileSync('404.html', path.join(distDocsPath, '404.html'));
+}
+fs.cpSync(path.join(distPath, 'assets'), path.join(distDocsPath, 'assets'), { recursive: true });
+
 // Sync to docs/ directory for main branch GitHub Pages deployment option
 console.log('Copying production bundle to docs folder...');
 if (fs.existsSync(docsPath)) {
@@ -34,7 +46,7 @@ try {
   execSync('git init', { cwd: distPath, stdio: 'ignore' });
   execSync('git checkout -B gh-pages', { cwd: distPath, stdio: 'ignore' });
   execSync('git add -A', { cwd: distPath, stdio: 'ignore' });
-  execSync('git commit -m "Deploy direct scan checklist & Supabase sync update"', { cwd: distPath, stdio: 'ignore' });
+  execSync('git commit -m "Deploy multi-asset landscape checklist and 404 fix"', { cwd: distPath, stdio: 'ignore' });
   execSync('git remote add origin https://github.com/Riyazrthd/M-M.git', { cwd: distPath, stdio: 'ignore' });
   execSync('git push origin gh-pages --force', { cwd: distPath, stdio: 'inherit' });
   console.log('✓ Successfully pushed compiled bundle to gh-pages branch!');
@@ -46,4 +58,3 @@ try {
     fs.rmSync(gitDir, { recursive: true, force: true });
   }
 }
-

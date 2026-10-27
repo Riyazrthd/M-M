@@ -6,14 +6,11 @@
     <title>Indus Fire Safety — Loading</title>
     <script>
       (function() {
-        var origin = window.location.origin;
-        var pathname = window.location.pathname;
-        var search = window.location.search;
-        var hash = window.location.hash;
-
+        var search = window.location.search || '';
+        var hash = window.location.hash || '';
+        // If a user landed on /M-M/docs/ or any broken link, redirect to root /M-M/ with params preserved
         if (window.location.hostname.includes('github.io')) {
-          var target = '/M-M/docs/' + search + hash;
-          window.location.replace(target);
+          window.location.replace('/M-M/' + search + hash);
         } else {
           window.location.replace('./' + search + hash);
         }
@@ -23,7 +20,7 @@
   <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 80vh; text-align: center; color: #111827;">
     <div>
       <p style="font-weight: 600;">Redirecting to Indus Fire Safety Inspection System...</p>
-      <p><a href="/M-M/docs/" style="color: #A80018;">Click here if not redirected automatically</a></p>
+      <p><a href="/M-M/" style="color: #A80018; font-weight: 600;">Click here to open application</a></p>
     </div>
   </body>
 </html>
