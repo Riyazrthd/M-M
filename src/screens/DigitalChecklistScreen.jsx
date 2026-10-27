@@ -1071,43 +1071,16 @@ export default function DigitalChecklistScreen({
                     {rec.remarks || <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>None</span>}
                   </td>
 
-                  {/* System Timestamp & Lock Status */}
-                  <td style={{ padding: '6px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        backgroundColor: rec.overallResult === 'Defective' ? '#FEE2E2' : '#DCFCE7',
-                        color: rec.overallResult === 'Defective' ? '#B91C1C' : '#15803D',
-                        border: rec.overallResult === 'Defective' ? '1px solid #FCA5A5' : '1px solid #86EFAC'
-                      }}>
-                        <Lock size={10} />
-                        <span>{rec.overallResult === 'Defective' ? 'Fail (Locked)' : 'Pass (Locked)'}</span>
-                      </span>
-                      <div style={{
-                        backgroundColor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: '4px',
-                        padding: '3px 5px',
-                        width: '100%',
-                        fontSize: '0.66rem',
-                        lineHeight: 1.25
-                      }}>
-                        <div style={{ fontWeight: 700, color: '#0F172A' }}>
-                          📅 {rec.submissionDate || (rec.submittedAt ? rec.submittedAt.split(' ')[0] : 'N/A')}
-                        </div>
-                        <div style={{ fontWeight: 800, color: '#2563EB', fontFamily: 'monospace' }}>
-                          ⏰ {rec.submissionTime || (rec.submittedAt ? rec.submittedAt.split(' ').slice(1).join(' ') : 'N/A')}
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '0.62rem', color: '#64748B', fontWeight: 600 }}>
-                        🔒 {rec.technicianName?.split(' ')[0] || 'Technician'}
-                      </div>
+                  {/* Date, Time & Technician Name (Compact Style - No Big Elements) */}
+                  <td style={{ padding: '4px 6px', border: '1px solid #CBD5E1', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#0F172A', lineHeight: 1.25 }}>
+                      {rec.submissionDate || (rec.submittedAt ? rec.submittedAt.split(' ')[0] : 'N/A')}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563EB', fontFamily: 'monospace', lineHeight: 1.25 }}>
+                      {rec.submissionTime || (rec.submittedAt ? rec.submittedAt.split(' ').slice(1).join(' ') : 'N/A')}
+                    </div>
+                    <div style={{ fontSize: '0.70rem', color: '#475569', fontWeight: 500, lineHeight: 1.25 }}>
+                      {rec.technicianName || 'Technician'}
                     </div>
                   </td>
                 </tr>
