@@ -17,6 +17,10 @@ import {
   downloadChecklistExcel, 
   downloadMasterWorkbookExcel 
 } from '../utils/checklistExporter';
+import {
+  downloadChecklistPDF,
+  downloadChecklistStandaloneHTML
+} from '../utils/checklistPDFExporter';
 import PhotoCapture from '../components/PhotoCapture';
 import { 
   Check, 
@@ -89,6 +93,7 @@ export default function DigitalChecklistScreen({
   const [validationError, setValidationError] = useState('');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState('');
   const [isDownloadingExcel, setIsDownloadingExcel] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState('');
 
   // Camera QR Scanner Modal State
@@ -335,7 +340,9 @@ export default function DigitalChecklistScreen({
 
     if (result.success) {
       setSubmittedRecords([...result.session.records]);
-      setSaveSuccessNotice(`✓ Asset observation for "${posId}" submitted and locked successfully. Ready for next asset.`);
+      const lastRec = result.session.records[result.session.records.length - 1];
+      const stamp = lastRec?.submittedAt || `${lastRec?.submissionDate} ${lastRec?.submissionTime}` || 'just now';
+      setSaveSuccessNotice(`✓ Asset observation for "${posId}" submitted and locked at ${stamp} by system clock. Ready for next asset.`);
       
       // Reset active observation for next asset
       setActiveAsset(null);
@@ -372,6 +379,53 @@ export default function DigitalChecklistScreen({
   };
 
   // -------------------------------------------------------------
+  // Master Landscape PDF Download (Exact Control Copy Layout & System Timestamps)
+  // -------------------------------------------------------------
+  const handleDownloadPDF = () => {
+    setIsDownloadingPDF(true);
+    setValidationError('');
+    try {
+      const recordsToExport = submittedRecords.length > 0 ? submittedRecords : (activeAsset ? [{
+        sn: 1,
+        area: activeArea || 'Plant Area',
+        positionId: activePosId || 'POS-AIL-001',
+        idNo: activePosId || 'POS-AIL-001',
+        serialNo: activeAsset?.currentEquipment?.serialNo || activeAsset?.serialNumber || 'IFS-EXT-2026-001',
+        location: activeLocation || 'Location',
+        answers: activeAnswers,
+        remarks: activeRemarks,
+        technicianName: inspectingTechName.trim() || user.name || 'Ramesh Patel',
+        submissionDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        submissionTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+        submittedAt: `${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`
+      }] : []);
+
+      downloadChecklistPDF(selectedTemplateId, {
+        clientName: activeSite?.clientName || activeSite?.name || 'Aarti Industries Limited',
+        siteAddress: activeSite?.address || 'Plot 2201/2202, Jhagadia GIDC Industrial Estate, Bharuch, Gujarat 393110',
+        poNumber: activeSite?.poNumber || 'PO/AIL/AMC/2026/8812',
+        poDate: activeSite?.poDate || '2026-04-01',
+        workOrderRef: activeSite?.workOrderRef || 'WO-IFSPL-2026-OCT-094',
+        dateOfService: new Date().toISOString().substring(0, 10).split('-').reverse().join('-'),
+        inspectionTime: currentLiveTime || new Date().toLocaleTimeString(),
+        frequency: activeSite?.frequency || 'Quarterly',
+        monthPeriod: 'October – 2026',
+        records: recordsToExport,
+        engineerName: inspectingTechName.trim() || user.name || 'Ramesh Patel',
+        engineerBadge: inspectingTechBadge || 'IFS-SE-041',
+        supervisorName: 'Sanjay Sharma',
+        clientWitnessName: activeSite?.clientContact || 'Vikram Shah'
+      });
+      setDownloadNotice(`✓ Generated Landscape PDF for ${template.id} containing all ${recordsToExport.length} inspected asset records with exact system timestamps.`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      setValidationError(`PDF generation error: ${err.message}. Master Excel export is also available.`);
+    } finally {
+      setTimeout(() => setIsDownloadingPDF(false), 1200);
+    }
+  };
+
+  // -------------------------------------------------------------
   // Master Excel (.xlsx) Download (Exact Control Copy Layout)
   // -------------------------------------------------------------
   const handleDownloadExcel = async () => {
@@ -393,14 +447,14 @@ export default function DigitalChecklistScreen({
           idNo: r.positionId,
           location: r.location,
           answers: r.answers,
-          remarks: r.remarks
+          remarks: r.remarks ? `${r.remarks} [Captured: ${r.submittedAt || (r.submissionDate + ' ' + r.submissionTime)}]` : `[Captured: ${r.submittedAt || (r.submissionDate + ' ' + r.submissionTime)}]`
         })),
         engineerName: inspectingTechName.trim() || user.name || 'Ramesh Patel',
         supervisorName: 'Sanjay Sharma',
         clientWitnessName: activeSite?.clientContact || 'Vikram Shah',
         visitRemarks: 'Routine AMC servicing completed in accordance with IFSPL SOP specifications.'
       });
-      setDownloadNotice(`✓ Downloaded ${template.id} master Excel file containing all ${submittedRecords.length} inspected asset records.`);
+      setDownloadNotice(`✓ Downloaded ${template.id} master Excel file containing all ${submittedRecords.length} inspected asset records with system timestamps.`);
     } catch (err) {
       console.error('Download error:', err);
       setValidationError(`Excel generation note: ${err.message}. Exporting CSV fallback.`);
@@ -494,8 +548,29 @@ export default function DigitalChecklistScreen({
           )}
         </div>
 
-        {/* Master Excel & CSV Export Buttons */}
+        {/* Landscape PDF, Master Excel & CSV Export Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isDownloadingPDF}
+            className="btn-primary"
+            style={{
+              height: '36px',
+              padding: '0 14px',
+              fontSize: '0.82rem',
+              backgroundColor: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: isDownloadingPDF ? 'wait' : 'pointer',
+              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.3)'
+            }}
+            title="Download filled checklist in exact original landscape PDF format"
+          >
+            <Download size={15} />
+            <span>{isDownloadingPDF ? 'Opening Print PDF...' : 'Download PDF'}</span>
+          </button>
+
           <button
             onClick={handleDownloadExcel}
             disabled={isDownloadingExcel}
@@ -814,8 +889,8 @@ export default function DigitalChecklistScreen({
                 <th style={{ width: '170px', padding: '10px 8px', border: '1px solid #334155' }}>
                   Remarks
                 </th>
-                <th style={{ width: '140px', padding: '10px 8px', border: '1px solid #334155', textAlign: 'center' }}>
-                  Observation Status
+                <th style={{ width: '165px', padding: '10px 8px', border: '1px solid #334155', textAlign: 'center' }}>
+                  System Timestamp (Captured)
                 </th>
               </tr>
 
@@ -840,7 +915,7 @@ export default function DigitalChecklistScreen({
                   </th>
                 ))}
                 <th style={{ padding: '6px 8px', border: '1px solid #CBD5E1' }}>Abnormalities</th>
-                <th style={{ padding: '6px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>Lock State</th>
+                <th style={{ padding: '6px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>Date & Time Captured</th>
               </tr>
 
               {/* Header Row 3: Applicability */}
@@ -855,7 +930,7 @@ export default function DigitalChecklistScreen({
                   </th>
                 ))}
                 <th style={{ padding: '4px 8px', border: '1px solid #CBD5E1' }}>Notes</th>
-                <th style={{ padding: '4px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>Action</th>
+                <th style={{ padding: '4px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>System Clock</th>
               </tr>
             </thead>
 
@@ -1083,11 +1158,14 @@ export default function DigitalChecklistScreen({
                       boxShadow: '0 2px 4px rgba(5,150,105,0.3)',
                       whiteSpace: 'nowrap'
                     }}
-                    title="Lock observation for this asset and open same checklist for next asset"
+                    title="Lock observation for this asset and capture exact system date and time"
                   >
                     <CheckCheck size={14} />
                     <span>Submit Obs.</span>
                   </button>
+                  <span style={{ display: 'block', fontSize: '0.62rem', color: '#047857', marginTop: '3px', fontWeight: 600 }}>
+                    🕒 Auto-records Date & Time
+                  </span>
                 </td>
               </tr>
 
@@ -1186,26 +1264,44 @@ export default function DigitalChecklistScreen({
                     {rec.remarks || <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>None</span>}
                   </td>
 
-                  {/* Locked Status Badge */}
-                  <td style={{ padding: '8px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '3px 8px',
-                      borderRadius: '9999px',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      backgroundColor: rec.overallResult === 'Defective' ? '#FEE2E2' : '#DCFCE7',
-                      color: rec.overallResult === 'Defective' ? '#B91C1C' : '#15803D',
-                      border: rec.overallResult === 'Defective' ? '1px solid #FCA5A5' : '1px solid #86EFAC'
-                    }}>
-                      <Lock size={11} />
-                      <span>{rec.overallResult === 'Defective' ? 'Locked (Fail)' : 'Locked (Pass)'}</span>
-                    </span>
-                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#64748B', marginTop: '2px' }}>
-                      {rec.submittedAt?.split(' ')[1] || 'Done'} • {rec.technicianName?.split(' ')[0]}
-                    </span>
+                  {/* System Timestamp & Lock Status */}
+                  <td style={{ padding: '6px 8px', border: '1px solid #CBD5E1', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        backgroundColor: rec.overallResult === 'Defective' ? '#FEE2E2' : '#DCFCE7',
+                        color: rec.overallResult === 'Defective' ? '#B91C1C' : '#15803D',
+                        border: rec.overallResult === 'Defective' ? '1px solid #FCA5A5' : '1px solid #86EFAC'
+                      }}>
+                        <Lock size={10} />
+                        <span>{rec.overallResult === 'Defective' ? 'Fail (Locked)' : 'Pass (Locked)'}</span>
+                      </span>
+                      <div style={{
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '4px',
+                        padding: '3px 5px',
+                        width: '100%',
+                        fontSize: '0.66rem',
+                        lineHeight: 1.25
+                      }}>
+                        <div style={{ fontWeight: 700, color: '#0F172A' }}>
+                          📅 {rec.submissionDate || (rec.submittedAt ? rec.submittedAt.split(' ')[0] : 'N/A')}
+                        </div>
+                        <div style={{ fontWeight: 800, color: '#2563EB', fontFamily: 'monospace' }}>
+                          ⏰ {rec.submissionTime || (rec.submittedAt ? rec.submittedAt.split(' ').slice(1).join(' ') : 'N/A')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.62rem', color: '#64748B', fontWeight: 600 }}>
+                        🔒 {rec.technicianName?.split(' ')[0] || 'Technician'}
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1300,6 +1396,31 @@ export default function DigitalChecklistScreen({
                 <span>Checklist Finalized & Locked</span>
               </span>
             )}
+
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={isDownloadingPDF}
+              style={{
+                height: '42px',
+                padding: '0 18px',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                backgroundColor: '#DC2626',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: isDownloadingPDF ? 'wait' : 'pointer',
+                boxShadow: '0 2px 5px rgba(220, 38, 38, 0.35)'
+              }}
+              title="Download exact original landscape PDF with system timestamps"
+            >
+              <Download size={16} />
+              <span>{isDownloadingPDF ? 'Opening Print PDF...' : 'Download PDF'}</span>
+            </button>
 
             <button
               type="button"

@@ -1104,9 +1104,9 @@ export function submitAssetObservation(visitId, templateId, observationData) {
 
   const session = visit.checklistSessions[templateId];
   const now = new Date();
-  const formattedDate = now.toISOString().substring(0, 10);
-  const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const fullTimestamp = `${formattedDate} ${formattedTime}`;
+  const dateFormatted = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeFormatted = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const fullTimestamp = `${dateFormatted} ${timeFormatted}`;
 
   const posId = observationData.positionId;
   const positions = getPositions();
@@ -1145,7 +1145,10 @@ export function submitAssetObservation(visitId, templateId, observationData) {
     technicianName: observationData.technicianName || 'Ramesh Patel',
     technicianBadge: observationData.technicianBadge || 'IFS-SE-041',
     technicianRole: observationData.technicianRole || 'Lead Service Engineer',
+    submissionDate: dateFormatted,
+    submissionTime: timeFormatted,
     submittedAt: fullTimestamp,
+    submittedAtIso: now.toISOString(),
     isLocked: true
   };
 
@@ -1175,8 +1178,8 @@ export function submitAssetObservation(visitId, templateId, observationData) {
     technicianBadge: newRecord.technicianBadge,
     technicianRole: newRecord.technicianRole,
     timestamp: fullTimestamp,
-    inspectionDate: formattedDate,
-    inspectionTime: formattedTime
+    inspectionDate: dateFormatted,
+    inspectionTime: timeFormatted
   });
 
   return { success: true, record: newRecord, session };
