@@ -17,7 +17,10 @@ import {
   getCurrentUser,
   setCurrentUser,
   addSite,
-  updateSite
+  updateSite,
+  getChecklistSession,
+  submitAssetObservation,
+  completeChecklistSession
 } from '../data/storage.js';
 
 let totalTests = 0;
@@ -305,6 +308,94 @@ assert(updatedClient.poNumber === 'PO/RIL/FIRE/2026/9901-REV1', 'Updated PO Numb
 assert(updatedClient.amcType === 'Quarterly', 'Updated AMC Type persists');
 assert(updatedClient.noOfVisits === 4, 'Updated No of Visits persists');
 assert(updatedClient.amcExpiryDate === '2027-05-31', 'Updated AMC Expire Date persists');
+
+// -------------------------------------------------------------------------
+// WORKFLOW 13: Multiple Asset Inspections in One Parent Checklist Session
+// -------------------------------------------------------------------------
+console.log('\nWORKFLOW 13: Multiple Asset Inspections in One Parent Checklist Session');
+const visit = getActiveVisit('SITE-AIL-001');
+const testTemplateId = 'CL-11';
+
+// 1. Initialize parent session
+const session1 = getChecklistSession(visit.visitId, testTemplateId);
+assert(session1 !== null && session1.templateId === testTemplateId, 'Parent checklist session initialized successfully');
+assert(session1.sessionId === `SESSION-${testTemplateId}-${visit.visitId}`, 'Parent session ID formatted correctly');
+
+// 2. Submit Observation for Asset 1 (FE-001 / POS-AIL-001)
+const obs1 = submitAssetObservation(visit.visitId, testTemplateId, {
+  positionId: 'POS-AIL-001',
+  serialNo: 'IFS-EXT-2026-001',
+  equipmentType: 'Fire Extinguisher',
+  area: 'Plant 1',
+  location: 'Reaction Bay Pillar C-4',
+  answers: {
+    1: 'OK', 2: 'OK', 3: 'OK', 4: 'OK', 5: 'OK',
+    6: 'OK', 7: 'OK', 8: 'OK', 9: 'OK'
+  },
+  remarks: 'Pressure gauge green zone verified',
+  technicianName: 'Ramesh Patel',
+  technicianBadge: 'IFS-SE-041',
+  technicianRole: 'Lead Service Engineer'
+});
+
+assert(obs1.success === true, 'First asset observation submitted successfully');
+assert(obs1.record.sn === 1, 'First asset assigned SR. No. 1');
+assert(obs1.record.isLocked === true, 'First asset observation result is permanently LOCKED');
+assert(obs1.record.overallResult === 'Pass', 'First asset result is Pass');
+
+// 3. Submit Observation for Asset 2 (FE-002 / POS-AIL-002) in the SAME checklist
+const obs2 = submitAssetObservation(visit.visitId, testTemplateId, {
+  positionId: 'POS-AIL-002',
+  serialNo: 'IFS-EXT-2026-002',
+  equipmentType: 'Fire Extinguisher',
+  area: 'Plant 1',
+  location: 'Boiler House East Gate',
+  answers: {
+    1: 'OK', 2: 'OK', 3: 'NOT_OK', 4: 'OK', 5: 'OK',
+    6: 'OK', 7: 'OK', 8: 'OK', 9: 'OK'
+  },
+  remarks: 'Pressure slightly depressed - flagged for servicing',
+  technicianName: 'Ramesh Patel',
+  technicianBadge: 'IFS-SE-041',
+  technicianRole: 'Lead Service Engineer'
+});
+
+assert(obs2.success === true, 'Second asset observation submitted successfully in SAME checklist');
+assert(obs2.record.sn === 2, 'Second asset assigned SR. No. 2');
+assert(obs2.record.isLocked === true, 'Second asset observation result is permanently LOCKED');
+assert(obs2.record.overallResult === 'Defective', 'Second asset defect detected accurately');
+
+// 4. Verify previous asset was NOT overwritten
+const currentSession = getChecklistSession(visit.visitId, testTemplateId);
+assert(currentSession.records.length === 2, `Checklist session holds both assets together (count: ${currentSession.records.length})`);
+assert(currentSession.records[0].positionId === 'POS-AIL-001', 'First asset observation preserved intact');
+assert(currentSession.records[0].answers[3] === 'OK', 'First asset observation data NOT overwritten by second asset');
+assert(currentSession.records[1].positionId === 'POS-AIL-002', 'Second asset appears as Row 2 below first asset');
+
+// 5. Submit Observation for Asset 3 (FE-003 / POS-AIL-003) in the SAME checklist
+const obs3 = submitAssetObservation(visit.visitId, testTemplateId, {
+  positionId: 'POS-AIL-003',
+  serialNo: 'IFS-EXT-2026-003',
+  equipmentType: 'Fire Extinguisher',
+  area: 'Warehouse B',
+  location: 'Loading Bay Column 3',
+  answers: {
+    1: 'OK', 2: 'OK', 3: 'OK', 4: 'OK', 5: 'OK',
+    6: 'OK', 7: 'OK', 8: 'OK', 9: 'OK'
+  },
+  remarks: 'Good physical condition',
+  technicianName: 'Ramesh Patel',
+  technicianBadge: 'IFS-SE-041'
+});
+assert(obs3.success === true, 'Third asset observation submitted successfully');
+assert(obs3.record.sn === 3, 'Third asset assigned SR. No. 3');
+
+// 6. Complete Checklist Session
+const completeResult = completeChecklistSession(visit.visitId, testTemplateId);
+assert(completeResult.success === true, 'Complete Checklist action executed successfully');
+assert(completeResult.session.status === 'Completed', 'Parent checklist status updated to "Completed"');
+assert(completeResult.session.records.length === 3, 'All 3 asset observations preserved after parent completion');
+assert(completeResult.session.completedAt !== null, 'Completion timestamp recorded on parent session');
 
 // -------------------------------------------------------------------------
 // SUMMARY

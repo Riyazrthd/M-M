@@ -267,7 +267,7 @@ export default function App() {
         </div>
 
         {/* Main Inspection Body */}
-        <main style={{ flex: 1, padding: '18px 14px', maxWidth: '960px', width: '100%', margin: '0 auto' }}>
+        <main style={{ flex: 1, padding: '16px 14px', maxWidth: '1400px', width: '100%', margin: '0 auto' }}>
           {currentScreen === 'digital-checklist' && (
             <DigitalChecklistScreen
               position={pos}

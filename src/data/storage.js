@@ -1029,3 +1029,174 @@ export function getSyncQueueCount() {
     return 0;
   }
 }
+
+// -------------------------------------------------------------
+// Multi-Asset Checklist Session Engine (Multiple Assets in One Checklist)
+// -------------------------------------------------------------
+
+export function getChecklistSession(visitId, templateId) {
+  const visits = getVisits();
+  const vIndex = visits.findIndex(v => v.visitId === visitId);
+  if (vIndex === -1) return null;
+
+  const visit = visits[vIndex];
+  if (!visit.checklistSessions) {
+    visit.checklistSessions = {};
+  }
+
+  if (!visit.checklistSessions[templateId]) {
+    // Populate session with any existing answers for this template
+    const existingRecords = [];
+    const positions = getPositions();
+
+    if (visit.checklistAnswers) {
+      Object.entries(visit.checklistAnswers).forEach(([posId, ans]) => {
+        if (ans.templateId === templateId) {
+          const pos = positions.find(p => p.positionId === posId) || {};
+          existingRecords.push({
+            sn: existingRecords.length + 1,
+            positionId: posId,
+            assetId: posId,
+            serialNo: pos.currentEquipment?.serialNo || pos.serialNumber || 'N/A',
+            equipmentType: pos.equipmentType || ans.templateId,
+            area: pos.area || ans.area || 'Plant Area',
+            location: pos.location || ans.location || 'Location',
+            capacity: pos.capacity || 'Standard',
+            answers: ans.items || {},
+            remarks: ans.remarks || '',
+            photos: ans.photos || [],
+            overallResult: ans.overallResult || 'Pass',
+            technicianName: ans.technicianName || visit.serviceEngineer || 'Ramesh Patel',
+            technicianBadge: ans.technicianBadge || 'IFS-SE-041',
+            technicianRole: ans.technicianRole || 'Lead Service Engineer',
+            submittedAt: ans.timestamp || ans.savedAt || new Date().toISOString(),
+            isLocked: true
+          });
+        }
+      });
+    }
+
+    visit.checklistSessions[templateId] = {
+      sessionId: `SESSION-${templateId}-${visitId}`,
+      templateId,
+      visitId,
+      status: existingRecords.length > 0 ? 'In Progress' : 'Draft',
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      records: existingRecords
+    };
+    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  }
+
+  return visit.checklistSessions[templateId];
+}
+
+export function submitAssetObservation(visitId, templateId, observationData) {
+  const visits = getVisits();
+  const vIndex = visits.findIndex(v => v.visitId === visitId);
+  if (vIndex === -1) return { success: false, error: 'Visit not found' };
+
+  const visit = visits[vIndex];
+  if (!visit.checklistSessions) visit.checklistSessions = {};
+  if (!visit.checklistSessions[templateId]) {
+    getChecklistSession(visitId, templateId);
+  }
+
+  const session = visit.checklistSessions[templateId];
+  const now = new Date();
+  const formattedDate = now.toISOString().substring(0, 10);
+  const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const fullTimestamp = `${formattedDate} ${formattedTime}`;
+
+  const posId = observationData.positionId;
+  const positions = getPositions();
+  const pos = positions.find(p => p.positionId === posId) || {};
+
+  const existingIdx = session.records.findIndex(r => r.positionId === posId);
+
+  // Compute counts
+  const answers = observationData.answers || {};
+  let okCount = 0;
+  let notOkCount = 0;
+  let naCount = 0;
+  Object.values(answers).forEach(val => {
+    const status = typeof val === 'object' ? val.status : val;
+    if (status === 'OK' || status === '√') okCount++;
+    else if (status === 'NOT_OK' || status === 'FAIL' || status === 'X') notOkCount++;
+    else if (status === 'NA') naCount++;
+  });
+
+  const overallResult = notOkCount > 0 ? 'Defective' : 'Pass';
+
+  const newRecord = {
+    sn: existingIdx >= 0 ? session.records[existingIdx].sn : (session.records.length + 1),
+    positionId: posId,
+    assetId: posId,
+    serialNo: pos.currentEquipment?.serialNo || pos.serialNumber || observationData.serialNo || 'N/A',
+    equipmentType: pos.equipmentType || observationData.equipmentType || 'Fire Protection Equipment',
+    area: pos.area || observationData.area || 'Plant Area',
+    location: pos.location || observationData.location || 'Mounting Point',
+    capacity: pos.capacity || 'Standard',
+    answers,
+    remarks: observationData.remarks || '',
+    photos: observationData.photos || [],
+    counts: { okCount, notOkCount, naCount, total: Object.keys(answers).length },
+    overallResult,
+    technicianName: observationData.technicianName || 'Ramesh Patel',
+    technicianBadge: observationData.technicianBadge || 'IFS-SE-041',
+    technicianRole: observationData.technicianRole || 'Lead Service Engineer',
+    submittedAt: fullTimestamp,
+    isLocked: true
+  };
+
+  if (existingIdx >= 0) {
+    session.records[existingIdx] = newRecord;
+  } else {
+    session.records.push(newRecord);
+  }
+
+  session.status = 'In Progress';
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+
+  // Also save to individual position checklist result for full backward-compatibility and sync
+  saveChecklistResult(visitId, posId, {
+    templateId,
+    items: answers,
+    remarks: observationData.remarks || '',
+    photos: observationData.photos || [],
+    overallResult,
+    counts: {
+      totalItems: Object.keys(answers).length,
+      okCount,
+      notOkCount,
+      naCount
+    },
+    technicianName: newRecord.technicianName,
+    technicianBadge: newRecord.technicianBadge,
+    technicianRole: newRecord.technicianRole,
+    timestamp: fullTimestamp,
+    inspectionDate: formattedDate,
+    inspectionTime: formattedTime
+  });
+
+  return { success: true, record: newRecord, session };
+}
+
+export function completeChecklistSession(visitId, templateId) {
+  const visits = getVisits();
+  const vIndex = visits.findIndex(v => v.visitId === visitId);
+  if (vIndex === -1) return { success: false, error: 'Visit not found' };
+
+  const visit = visits[vIndex];
+  if (!visit.checklistSessions || !visit.checklistSessions[templateId]) {
+    return { success: false, error: 'Session not found' };
+  }
+
+  const session = visit.checklistSessions[templateId];
+  session.status = 'Completed';
+  session.completedAt = new Date().toISOString();
+
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  return { success: true, session };
+}
+
