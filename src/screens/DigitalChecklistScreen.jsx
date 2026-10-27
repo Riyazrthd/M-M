@@ -973,12 +973,210 @@ export default function DigitalChecklistScreen({
 
             <tbody>
               {/* ================================================================
-                  1. SUBMITTED & PERMANENTLY LOCKED OBSERVATION RECORDS
-                  (SR. NO. 1, 2, 3...) Always preserved sequentially in exact order!
+                  1. NEW SCAN ENTRY ROW (ALWAYS UPPER / AT TOP OF TABLE)
+                  - Features compact camera/QR scan icon against SR. No.
+                  - Auto-fills asset details when scanned
+                  - Technician fills observation and clicks Submit Obs.
                   ================================================================ */}
+              {sessionStatus !== 'Completed' && (
+                <tr style={{
+                  backgroundColor: '#EFF6FF',
+                  border: '2px solid #2563EB',
+                  boxShadow: 'inset 0 0 4px rgba(37,99,235,0.1)'
+                }}>
+                  {/* SR. No. with COMPACT CAMERA / QR SCAN ICON */}
+                  <td style={{
+                    padding: '8px 6px',
+                    border: '1px solid #93C5FD',
+                    textAlign: 'center',
+                    verticalAlign: 'middle'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1E3A8A' }}>
+                        {activeSn}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleOpenScanner}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          backgroundColor: '#DC2626',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(220,38,38,0.3)',
+                          padding: 0
+                        }}
+                        title={`Click camera icon to scan asset QR code for Serial No. ${activeSn}`}
+                      >
+                        <Camera size={15} />
+                      </button>
+                    </div>
+                  </td>
+
+                  {/* Area / Plant (Auto-filled on QR scan) */}
+                  <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
+                    <input
+                      type="text"
+                      value={activeArea}
+                      onChange={(e) => setActiveAsset(prev => ({ ...prev, area: e.target.value }))}
+                      placeholder="Scan QR to auto-fill area..."
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        borderRadius: '4px',
+                        border: '1px solid #BFDBFE',
+                        backgroundColor: activeAsset ? '#FFFFFF' : '#F8FAFC',
+                        color: '#0F172A'
+                      }}
+                    />
+                  </td>
+
+                  {/* ID No. (Auto-filled on QR scan — NO separate input, NO button) */}
+                  <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
+                    {activeAsset ? (
+                      <div>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '3px 7px',
+                          borderRadius: '4px',
+                          backgroundColor: '#1E3A8A',
+                          color: '#FFFFFF',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          fontSize: '0.8rem'
+                        }}>
+                          {activePosId}
+                        </span>
+                        <span style={{ display: 'block', fontSize: '0.66rem', color: '#64748B', marginTop: '2px' }}>
+                          SN: {activeAsset.currentEquipment?.serialNo || activeAsset.serialNumber || 'N/A'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '0.74rem', color: '#94A3B8', fontStyle: 'italic' }}>
+                        Scan QR code...
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Location (Auto-filled on QR scan) */}
+                  <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
+                    <input
+                      type="text"
+                      value={activeLocation}
+                      onChange={(e) => setActiveAsset(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="Scan QR to auto-fill location..."
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        fontSize: '0.78rem',
+                        borderRadius: '4px',
+                        border: '1px solid #BFDBFE',
+                        backgroundColor: activeAsset ? '#FFFFFF' : '#F8FAFC',
+                        color: '#0F172A'
+                      }}
+                    />
+                  </td>
+
+                  {/* Observation Item Dropdowns (Columns 5 to N+4) */}
+                  {template.items.map((item) => {
+                    const val = activeAnswers[item.itemNo] || '';
+                    return (
+                      <td 
+                        key={item.itemNo} 
+                        style={{ 
+                          padding: '8px 4px', 
+                          border: '1px solid #93C5FD', 
+                          textAlign: 'center',
+                          verticalAlign: 'middle'
+                        }}
+                      >
+                        <select
+                          value={val}
+                          onChange={(e) => handleDropdownChange(item.itemNo, e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: '32px',
+                            padding: '0 4px',
+                            borderRadius: '4px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            backgroundColor: val === 'OK' ? '#DCFCE7' : val === 'NOT_OK' ? '#FEE2E2' : val === 'NA' ? '#FEF3C7' : '#FFFFFF',
+                            color: val === 'OK' ? '#15803D' : val === 'NOT_OK' ? '#B91C1C' : val === 'NA' ? '#B45309' : '#475569',
+                            border: val === 'OK' ? '1.5px solid #22C55E' : val === 'NOT_OK' ? '1.5px solid #EF4444' : val === 'NA' ? '1.5px solid #F59E0B' : '1px solid #94A3B8'
+                          }}
+                        >
+                          <option value="">--</option>
+                          <option value="OK">√ OK</option>
+                          <option value="NOT_OK">X Fail</option>
+                          <option value="NA">NA</option>
+                        </select>
+                      </td>
+                    );
+                  })}
+
+                  {/* Remarks Field */}
+                  <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
+                    <input
+                      type="text"
+                      value={activeRemarks}
+                      onChange={(e) => setActiveRemarks(e.target.value)}
+                      placeholder="Enter observation..."
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        fontSize: '0.78rem',
+                        borderRadius: '4px',
+                        border: '1px solid #BFDBFE',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A'
+                      }}
+                    />
+                  </td>
+
+                  {/* Submit Observation Button */}
+                  <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <button
+                      type="button"
+                      onClick={handleSubmitObservation}
+                      style={{
+                        width: '100%',
+                        height: '36px',
+                        backgroundColor: '#059669',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(5,150,105,0.3)',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="Lock observation for this asset and capture exact system date and time"
+                    >
+                      <CheckCheck size={14} />
+                      <span>Submit Obs.</span>
+                    </button>
+                  </td>
+                </tr>
+              )}
+
               {/* ================================================================
-                  SUBMITTED & LOCKED OBSERVATION RECORDS (Requirement 3, 4, 5)
-                  Appears below the entry row, preserved and locked
+                  2. ALL SUBMITTED RECORDS (UNDER SEQUENCE IN BELOW)
+                  - After submit, each record appears below under sequential Sr. No. (1, 2, 3...)
+                  - Permanently preserved and locked
                   ================================================================ */}
               {submittedRecords.map((rec) => (
                 <tr 
@@ -1085,206 +1283,6 @@ export default function DigitalChecklistScreen({
                   </td>
                 </tr>
               ))}
-
-              {/* ================================================================
-                  2. ACTIVE OBSERVATION ENTRY ROW (NEXT SEQUENTIAL SERIAL NO.)
-                  Rendered DIRECTLY below all submitted records!
-                  Features ONLY the COMPACT camera/QR scan icon against SR. No.
-                  ================================================================ */}
-              {sessionStatus !== 'Completed' && (
-                <tr style={{
-                backgroundColor: '#EFF6FF',
-                border: '2px solid #2563EB',
-                boxShadow: 'inset 0 0 4px rgba(37,99,235,0.1)'
-              }}>
-                {/* SR. No. with COMPACT CAMERA / QR SCAN ICON (Requirement 1) */}
-                <td style={{
-                  padding: '8px 6px',
-                  border: '1px solid #93C5FD',
-                  textAlign: 'center',
-                  verticalAlign: 'middle'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1E3A8A' }}>
-                      {activeSn}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleOpenScanner}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        backgroundColor: '#DC2626',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: '4px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(220,38,38,0.3)',
-                        padding: 0
-                      }}
-                      title={`Click camera icon to scan asset QR code for Serial No. ${activeSn}`}
-                    >
-                      <Camera size={15} />
-                    </button>
-                  </div>
-                </td>
-
-                {/* Area / Plant (Auto-filled on QR scan) */}
-                <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
-                  <input
-                    type="text"
-                    value={activeArea}
-                    onChange={(e) => setActiveAsset(prev => ({ ...prev, area: e.target.value }))}
-                    placeholder="Scan QR to auto-fill area..."
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      borderRadius: '4px',
-                      border: '1px solid #BFDBFE',
-                      backgroundColor: activeAsset ? '#FFFFFF' : '#F8FAFC',
-                      color: '#0F172A'
-                    }}
-                  />
-                </td>
-
-                {/* ID No. (Auto-filled on QR scan — NO separate input, NO button) */}
-                <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
-                  {activeAsset ? (
-                    <div>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '3px 7px',
-                        borderRadius: '4px',
-                        backgroundColor: '#1E3A8A',
-                        color: '#FFFFFF',
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        fontSize: '0.8rem'
-                      }}>
-                        {activePosId}
-                      </span>
-                      <span style={{ display: 'block', fontSize: '0.66rem', color: '#64748B', marginTop: '2px' }}>
-                        SN: {activeAsset.currentEquipment?.serialNo || activeAsset.serialNumber || 'N/A'}
-                      </span>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '0.74rem', color: '#94A3B8', fontStyle: 'italic' }}>
-                      Scan QR code...
-                    </span>
-                  )}
-                </td>
-
-                {/* Location (Auto-filled on QR scan) */}
-                <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
-                  <input
-                    type="text"
-                    value={activeLocation}
-                    onChange={(e) => setActiveAsset(prev => ({ ...prev, location: e.target.value }))}
-                    placeholder="Scan QR to auto-fill location..."
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      fontSize: '0.78rem',
-                      borderRadius: '4px',
-                      border: '1px solid #BFDBFE',
-                      backgroundColor: activeAsset ? '#FFFFFF' : '#F8FAFC',
-                      color: '#0F172A'
-                    }}
-                  />
-                </td>
-
-                {/* Observation Item Dropdowns (Columns 5 to N+4) */}
-                {template.items.map((item) => {
-                  const val = activeAnswers[item.itemNo] || '';
-                  return (
-                    <td 
-                      key={item.itemNo} 
-                      style={{ 
-                        padding: '8px 4px', 
-                        border: '1px solid #93C5FD', 
-                        textAlign: 'center',
-                        verticalAlign: 'middle'
-                      }}
-                    >
-                      <select
-                        value={val}
-                        onChange={(e) => handleDropdownChange(item.itemNo, e.target.value)}
-                        style={{
-                          width: '100%',
-                          height: '32px',
-                          padding: '0 4px',
-                          borderRadius: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          backgroundColor: val === 'OK' ? '#DCFCE7' : val === 'NOT_OK' ? '#FEE2E2' : val === 'NA' ? '#FEF3C7' : '#FFFFFF',
-                          color: val === 'OK' ? '#15803D' : val === 'NOT_OK' ? '#B91C1C' : val === 'NA' ? '#B45309' : '#475569',
-                          border: val === 'OK' ? '1.5px solid #22C55E' : val === 'NOT_OK' ? '1.5px solid #EF4444' : val === 'NA' ? '1.5px solid #F59E0B' : '1px solid #94A3B8'
-                        }}
-                      >
-                        <option value="">--</option>
-                        <option value="OK">√ OK</option>
-                        <option value="NOT_OK">X Fail</option>
-                        <option value="NA">NA</option>
-                      </select>
-                    </td>
-                  );
-                })}
-
-                {/* Remarks Field */}
-                <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', verticalAlign: 'middle' }}>
-                  <input
-                    type="text"
-                    value={activeRemarks}
-                    onChange={(e) => setActiveRemarks(e.target.value)}
-                    placeholder="Enter observation..."
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      fontSize: '0.78rem',
-                      borderRadius: '4px',
-                      border: '1px solid #BFDBFE',
-                      backgroundColor: '#FFFFFF',
-                      color: '#0F172A'
-                    }}
-                  />
-                </td>
-
-                {/* Submit Observation Button (Requirement 3, 5) */}
-                <td style={{ padding: '8px 6px', border: '1px solid #93C5FD', textAlign: 'center', verticalAlign: 'middle' }}>
-                  <button
-                    type="button"
-                    onClick={handleSubmitObservation}
-                    style={{
-                      width: '100%',
-                      height: '36px',
-                      backgroundColor: '#059669',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(5,150,105,0.3)',
-                      whiteSpace: 'nowrap'
-                    }}
-                    title="Lock observation for this asset and capture exact system date and time"
-                  >
-                    <CheckCheck size={14} />
-                    <span>Submit Obs.</span>
-                  </button>
-                </td>
-              </tr>
-              )}
             </tbody>
           </table>
         </div>
