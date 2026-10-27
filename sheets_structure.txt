@@ -1,0 +1,110 @@
+
+==================== CL-11 Extinguisher HPT (2) ====================
+R01: C0:INDUS FIRE SAFETY PRIVATE LIMITED
+R02: C0:Corporate Office: 903, Atlantis Heights, Sarabhai Compound, Vadodara-390 023, India.  Tele: 0265 2343441, 2343442, 2341633  |  Email: maint.ifss@yahoo.com  |  Web: www.indusfiresafety.com
+R03: C0:Checklist Doc. No. | C3:Reference SOP No. | C6:Revision | C9:Effective Date | C12:Doc. Type / Classification
+R04: C0:IFSPL/M&M/CL/011 | C3:IFSPL/M&M/SOP/011 | C6:00 | C9:01-10-2026 | C12:Checklist – Control Copy / Internal
+R05: C0:CL-11  |  CHECK LIST – HYDRO TESTING & PRESSURISATION OF FIRE EXTINGUISHERS
+R06: C0:Client Name & Address
+R07: C0:PO / Contract No. | C7:Job | C9:AMC – Testing, inspection & maintenance of fire protection equipment
+R08: C0:Work Order / Ref. No. | C7:Date of Service
+R09: C0:Frequency | C7:Month / Period
+R10: C0:Note: Put '√' for OK / Pass, 'X' for NOT OK / Fail and 'NA' for Not Applicable / Not Available. Record every abnormality in the Remarks column. Item numbers (1–9) are identical to the numbering in Section 6 (Check List Format) of IFSPL/M&M/SOP/011.
+R11: C0:SN | C1:Area / Plant | C2:ID No. | C3:Location | C4:Item 1 | C5:Item 2 | C6:Item 3 | C7:Item 4 | C8:Item 5 | C9:Item 6 | C10:Item 7 | C11:Item 8 | C12:Item 9 | C13:Remarks
+R12: C4:Calibration certificate of test gauge available | C5:Agent removed; outlets blinded; test with cap / valve | C6:Hydraulic test – 35 Bar for 3 minutes (no leakage / deformation) | C7:Date of hydro test marked on body | C8:Cap assembly, discharge tube, nozzle condition | C9:DCP powder / cartridge / CO2 weight check | C10:Nitrogen pressurisation (if applicable) | C11:Painting, label and tag (not for failed units) | C12:Test certificate issued
+R13: C4:Before start | C5:Each extinguisher | C6:Each extinguisher | C7:Each extinguisher | C8:Each extinguisher | C9:Each extinguisher | C10:As required | C11:Each extinguisher | C12:Each lot
+R14: C0:1
+R15: C0:2
+R16: C0:3
+R17: C0:4
+R18: C0:5
+R19: C0:6
+R20: C0:7
+R21: C0:8
+R22: C0:9
+R23: C0:10
+R24: C0:11
+R25: C0:12
+R26: C0:13
+R27: C0:14
+R28: C0:15
+R29: C0:16
+R30: C0:17
+R31: C0:18
+R32: C0:19
+R33: C0:20
+R34: C0:21
+R35: C0:22
+R36: C0:23
+R37: C0:24
+R38: C0:25
+R39: C0:Equipment / units checked (nos.) | C4:0
+R40: C0:Total √ (OK / Pass) | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0 | C12:0
+R41: C0:Total X (NOT OK / Fail) | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0 | C12:0
+R42: C0:Total NA | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0 | C12:0
+R44: C0:Remarks / Observations (including corrective actions, spares replaced and pending points)
+R49: C0:Applicable standards & performance baseline – IFSPL/M&M/SOP/011, Section 3 (Technical Specifications & Performance Baseline)
+R50: C0:•  Hydraulic test pressure: 35 Bar for three minutes (IS 2190).
+R51: C0:•  Painting: two coats of red oxide primer followed by two coats of red oxide paint, Shade 536 of IS 5.
+R52: C0:•  Pressurisation: dry nitrogen gas for pressure-type extinguishers.
+R53: C0:•  A lot of 20 extinguishers shall be refilled within 72 hours of handing over to the Firm's representative.
+R54: C0:•  Extinguishing agents (dry powder / AFFF) are provided by the Client.
+R56: C0:Checked by (Service Engineer) | C5:Verified by (Supervisor / Technical) | C10:Witnessed by (Client I/C Fire Services)
+R57: C0:Name: | C5:Name: | C10:Name:
+R58: C0:Signature: | C5:Signature: | C10:Signature:
+R59: C0:Date: | C5:Date: | C10:Date:
+R60: C0:For Indus Fire Safety Private Limited – Authorised Signatory (Seal & Signature): ______________________________
+
+==================== CL-03 Hose Boxes (2) ====================
+R01: C0:INDUS FIRE SAFETY PRIVATE LIMITED
+R02: C0:Corporate Office: 903, Atlantis Heights, Sarabhai Compound, Vadodara-390 023, India.  Tele: 0265 2343441, 2343442, 2341633  |  Email: maint.ifss@yahoo.com  |  Web: www.indusfiresafety.com
+R03: C0:Checklist Doc. No. | C3:Reference SOP No. | C6:Revision | C9:Effective Date | C12:Doc. Type / Classification
+R04: C0:IFSPL/M&M/CL/003 | C3:IFSPL/M&M/SOP/003 | C6:00 | C9:01-10-2026 | C12:Checklist – Control Copy / Internal
+R05: C0:CL-03  |  CHECK LIST – DELIVERY HOSE BOXES MAINTENANCE
+R06: C0:Client Name & Address
+R07: C0:PO / Contract No. | C6:Job | C8:AMC – Testing, inspection & maintenance of fire protection equipment
+R08: C0:Work Order / Ref. No. | C6:Date of Service
+R09: C0:Frequency | C6:Month / Period
+R10: C0:Note: Put '√' for OK / Pass, 'X' for NOT OK / Fail and 'NA' for Not Applicable / Not Available. Record every abnormality in the Remarks column. Item numbers (1–8) are identical to the numbering in Section 6 (Check List Format) of IFSPL/M&M/SOP/003.
+R11: C0:SN | C1:Area / Plant | C2:ID No. | C3:Location | C4:Item 1 | C5:Item 2 | C6:Item 3 | C7:Item 4 | C8:Item 5 | C9:Item 6 | C10:Item 7 | C11:Item 8 | C12:Remarks
+R12: C4:Front glass panel and key glass – intact | C5:Rubber beading / packing – condition | C6:Hinges and fittings – lubricated and functional | C7:Handle, lock and key availability | C8:Hoses and branch pipe present, clean and correctly stowed | C9:Box mounting and stand – stable and clean | C10:Painting – exterior Fire Red, interior white | C11:Labelling / numbering of hose box
+R13: C4:Each servicing | C5:Each servicing | C6:Each servicing | C7:Each servicing | C8:Each servicing | C9:Each servicing | C10:Each servicing / as required | C11:Each servicing
+R14: C0:1
+R15: C0:2
+R16: C0:3
+R17: C0:4
+R18: C0:5
+R19: C0:6
+R20: C0:7
+R21: C0:8
+R22: C0:9
+R23: C0:10
+R24: C0:11
+R25: C0:12
+R26: C0:13
+R27: C0:14
+R28: C0:15
+R29: C0:16
+R30: C0:17
+R31: C0:18
+R32: C0:19
+R33: C0:20
+R34: C0:21
+R35: C0:22
+R36: C0:23
+R37: C0:24
+R38: C0:25
+R39: C0:Equipment / units checked (nos.) | C4:0
+R40: C0:Total √ (OK / Pass) | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0
+R41: C0:Total X (NOT OK / Fail) | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0
+R42: C0:Total NA | C4:0 | C5:0 | C6:0 | C7:0 | C8:0 | C9:0 | C10:0 | C11:0
+R44: C0:Remarks / Observations (including corrective actions, spares replaced and pending points)
+R49: C0:Applicable standards & performance baseline – IFSPL/M&M/SOP/003, Section 3 (Technical Specifications & Performance Baseline)
+R50: C0:•  Hose box: LDPE construction suitable to accommodate 2 nos. 15 m long fire fighting hoses (Type B) with coupling and branch pipe.
+R51: C0:•  Finish: exterior Fire Red (IS 5, Shade 536) over 2 coats of primer; interior white; hinged double doors with polycarbonate glazing and locking arrangement.
+R52: C0:•  Door glass: polycarbonate of proper size with rubber beading.
+R54: C0:Checked by (Service Engineer) | C4:Verified by (Supervisor / Technical) | C8:Witnessed by (Client I/C Fire Services)
+R55: C0:Name: | C4:Name: | C8:Name:
+R56: C0:Signature: | C4:Signature: | C8:Signature:
+R57: C0:Date: | C4:Date: | C8:Date:
+R58: C0:For Indus Fire Safety Private Limited – Authorised Signatory (Seal & Signature): ______________________________
