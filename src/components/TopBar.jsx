@@ -51,7 +51,8 @@ export default function TopBar({
 
   return (
     <header style={{
-      height: '56px',
+      height: '50px',
+      minHeight: '50px',
       backgroundColor: '#FFFFFF',
       borderBottom: '1px solid #E1E5E9',
       position: 'sticky',
@@ -60,18 +61,19 @@ export default function TopBar({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 16px',
-      gap: '12px',
+      padding: '0 14px',
+      gap: '10px',
       width: '100%',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      overflow: 'hidden'
     }}>
       {/* Left: Mobile Toggle & Page Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 0 }}>
         <button
           onClick={onToggleMobileMenu}
           className="mobile-hamburger-btn"
           style={{
-            padding: '6px',
+            padding: '5px',
             borderRadius: '6px',
             color: '#536174',
             display: 'none', // Shown via CSS media query
@@ -79,127 +81,137 @@ export default function TopBar({
             justifyContent: 'center',
             minHeight: 'unset',
             border: '1px solid #E1E5E9',
-            backgroundColor: '#FFFFFF'
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer'
           }}
           title="Open Menu"
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <h1 style={{
-            fontSize: '18px',
-            fontWeight: 600,
-            color: '#17191C',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: '#111827',
             margin: 0,
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em'
           }}>
             {SCREEN_TITLES[currentScreen] || 'Indus AMC System'}
           </h1>
           <span style={{
-            fontSize: '11px',
-            fontWeight: 600,
+            fontSize: '10.5px',
+            fontWeight: 700,
             padding: '2px 6px',
             borderRadius: '4px',
             backgroundColor: '#EFF6FF',
             color: '#2563EB',
-            border: '1px solid #DBEAFE'
+            border: '1px solid #DBEAFE',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 1.2
           }}>
             Phase 1
           </span>
         </div>
       </div>
 
-      {/* Center: Makoro Global Command Search Bar */}
+      {/* Center: Compact Global Command Search Bar */}
       <div 
         onClick={onOpenCommandPalette}
         style={{
-          flex: 1,
-          maxWidth: '520px',
-          minWidth: 0,
-          height: '38px',
-          backgroundColor: '#F7F8F9',
-          border: '1px solid #E1E5E9',
-          borderRadius: '8px',
+          flex: '1 1 auto',
+          maxWidth: '280px',
+          minWidth: '120px',
+          height: '32px',
+          backgroundColor: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          borderRadius: '6px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 12px',
+          padding: '0 9px',
           cursor: 'pointer',
-          transition: 'all 0.15s ease'
+          transition: 'all 0.15s ease',
+          boxSizing: 'border-box',
+          overflow: 'hidden'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#D1D5DB';
-          e.currentTarget.style.backgroundColor = '#E8E9EA';
+          e.currentTarget.style.borderColor = '#CBD5E1';
+          e.currentTarget.style.backgroundColor = '#F1F5F9';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = '#E1E5E9';
-          e.currentTarget.style.backgroundColor = '#F7F8F9';
+          e.currentTarget.style.borderColor = '#E2E8F0';
+          e.currentTarget.style.backgroundColor = '#F8FAFC';
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-          <Search size={16} color="#788494" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+          <Search size={14} color="#64748B" style={{ flexShrink: 0 }} />
           <span style={{
-            fontSize: '13.5px',
-            color: '#788494',
+            fontSize: '12px',
+            color: '#64748B',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            Search assets, serials, QR tags, plants, SOP checklists...
+            Search assets, SOPs...
           </span>
         </div>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '4px',
-          fontSize: '11px',
+          gap: '2px',
+          fontSize: '10px',
           fontWeight: 600,
-          color: '#536174',
+          color: '#64748B',
           backgroundColor: '#FFFFFF',
-          border: '1px solid #E1E5E9',
-          padding: '2px 6px',
-          borderRadius: '5px'
+          border: '1px solid #E2E8F0',
+          padding: '1px 5px',
+          borderRadius: '4px',
+          flexShrink: 0,
+          marginLeft: '4px'
         }}>
-          <span>Ctrl</span>
-          <span>K</span>
+          <span>Ctrl K</span>
         </div>
       </div>
 
       {/* Right: Site Selector, Network Status, & Notifications */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         
         {/* Plant / Site Selector Pill */}
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => setShowSiteDropdown(!showSiteDropdown)}
             style={{
-              height: '36px',
-              minHeight: '36px',
-              padding: '0 12px',
-              borderRadius: '8px',
+              height: '32px',
+              minHeight: '32px',
+              padding: '0 9px',
+              borderRadius: '6px',
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #E2E8F0',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              fontSize: '0.82rem',
+              gap: '6px',
+              fontSize: '12px',
               fontWeight: 600,
-              color: '#111827',
-              cursor: 'pointer'
+              color: '#1E293B',
+              cursor: 'pointer',
+              boxSizing: 'border-box',
+              whiteSpace: 'nowrap'
             }}
           >
-            <Building2 size={15} color="#DC2626" />
+            <Building2 size={14} color="#DC2626" style={{ flexShrink: 0 }} />
             <span style={{
-              maxWidth: '160px',
+              maxWidth: '120px',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>
               {activeSite ? activeSite.name : 'Select Plant'}
             </span>
-            <ChevronDown size={14} color="#6B7280" />
+            <ChevronDown size={13} color="#64748B" style={{ flexShrink: 0 }} />
           </button>
 
           {/* Plant Selector Dropdown */}
@@ -257,25 +269,29 @@ export default function TopBar({
           )}
         </div>
 
-        {/* Network Status Badge */}
+        {/* Compact Network Status Badge */}
         <NetworkStatusBadge />
 
-        {/* Supabase Cloud Status & Backup Button */}
+        {/* Compact Supabase Cloud Status & Backup Button */}
         <button
           onClick={onOpenSupabaseBackup}
           style={{
-            height: '36px',
-            padding: '0 12px',
+            height: '32px',
+            minHeight: '32px',
+            padding: '0 9px',
             borderRadius: '6px',
             backgroundColor: '#F0FDF4',
             border: '1px solid #BBF7D0',
             color: '#166534',
-            fontSize: '13px',
-            fontWeight: 500,
+            fontSize: '12px',
+            fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer'
+            gap: '5px',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            boxSizing: 'border-box'
           }}
           title="Supabase Cloud Live (xvoirpdkblusopxrkbjo.supabase.co)"
           onMouseEnter={(e) => {
@@ -286,43 +302,45 @@ export default function TopBar({
           }}
         >
           <span style={{
-            width: '7px',
-            height: '7px',
+            width: '6px',
+            height: '6px',
             borderRadius: '50%',
-            backgroundColor: '#00875A'
+            backgroundColor: '#16A34A',
+            flexShrink: 0
           }} />
-          <Cloud size={16} color="#00875A" />
-          <span style={{ fontSize: '13px', fontWeight: 600 }}>Supabase Cloud</span>
+          <Cloud size={14} color="#16A34A" style={{ flexShrink: 0 }} />
+          <span>Supabase</span>
         </button>
 
         {/* Notification Bell */}
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
             style={{
-              width: '36px',
-              height: '36px',
-              minHeight: '36px',
-              borderRadius: '8px',
+              width: '32px',
+              height: '32px',
+              minHeight: '32px',
+              borderRadius: '6px',
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #E2E8F0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#4B5563',
+              color: '#475569',
               position: 'relative',
               cursor: 'pointer',
-              padding: 0
+              padding: 0,
+              boxSizing: 'border-box'
             }}
             title="Notifications"
           >
-            <Bell size={17} />
+            <Bell size={15} />
             <span style={{
               position: 'absolute',
-              top: '7px',
-              right: '7px',
-              width: '7px',
-              height: '7px',
+              top: '5px',
+              right: '5px',
+              width: '6px',
+              height: '6px',
               borderRadius: '50%',
               backgroundColor: '#DC2626'
             }} />

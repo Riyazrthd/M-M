@@ -23,55 +23,74 @@ export default function NetworkStatusBadge() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', flexShrink: 0 }}>
+      {/* Online Status Pill */}
       <div
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '6px',
-          padding: '4px 10px',
-          borderRadius: '9999px',
-          backgroundColor: isOnline ? 'var(--status-ok-bg)' : 'var(--status-fail-bg)',
-          color: isOnline ? 'var(--status-ok)' : 'var(--status-fail)',
-          border: `1px solid ${isOnline ? 'var(--status-ok-border)' : 'var(--status-fail-border)'}`,
-          fontWeight: 600
+          gap: '5px',
+          height: '32px',
+          padding: '0 8px',
+          borderRadius: '6px',
+          backgroundColor: isOnline ? '#F0FDF4' : '#FEF2F2',
+          color: isOnline ? '#166534' : '#991B1B',
+          border: `1px solid ${isOnline ? '#BBF7D0' : '#FECACA'}`,
+          fontWeight: 600,
+          fontSize: '11.5px',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          boxSizing: 'border-box'
         }}
         title={isOnline ? "Network Connected. Local storage operational." : "Offline Mode. Changes cached locally."}
       >
-        {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-        <span>{isOnline ? 'Online' : 'Offline Mode'}</span>
+        <span style={{
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          backgroundColor: isOnline ? '#16A34A' : '#DC2626',
+          flexShrink: 0
+        }} />
+        {isOnline ? <Wifi size={13} style={{ flexShrink: 0 }} /> : <WifiOff size={13} style={{ flexShrink: 0 }} />}
+        <span>{isOnline ? 'Online' : 'Offline'}</span>
       </div>
 
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          borderRadius: '9999px',
-          backgroundColor: 'var(--bg-subtle)',
-          color: 'var(--text-secondary)',
-          border: '1px solid var(--border-light)',
-          fontSize: '0.75rem',
-          fontWeight: 600
-        }}
-        title="Phase 1: Local state with persistent queue. Phase 2: Live Supabase / Cloud sync."
-      >
-        <RefreshCw size={11} style={{ opacity: 0.7 }} />
-        <span>Local Sync Ready</span>
-        {queueCount > 0 && (
+      {/* Sync Status Badge (Only shown when pending queue exists) */}
+      {queueCount > 0 && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            height: '32px',
+            padding: '0 7px',
+            borderRadius: '6px',
+            backgroundColor: '#EFF6FF',
+            color: '#1D4ED8',
+            border: '1px solid #BFDBFE',
+            fontSize: '11px',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            boxSizing: 'border-box'
+          }}
+          title={`${queueCount} inspection changes pending sync`}
+        >
+          <RefreshCw size={11} style={{ flexShrink: 0 }} />
+          <span>Sync</span>
           <span style={{ 
-            backgroundColor: 'var(--brand-crimson)', 
-            color: '#fff', 
+            backgroundColor: '#DC2626', 
+            color: '#FFFFFF', 
             borderRadius: '9999px', 
             padding: '1px 5px', 
-            fontSize: '0.68rem',
-            marginLeft: '2px'
+            fontSize: '10px',
+            lineHeight: 1,
+            fontWeight: 700
           }}>
             {queueCount}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
