@@ -139,32 +139,36 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex',
-        height: '116px',
+        height: '106px',
         flexDirection: 'column',
         overflow: 'hidden',
         borderRadius: '12px',
         backgroundColor: hovered ? '#EDEDED' : '#F4F5F5',
-        padding: '16px 18px',
+        padding: '13px 15px',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
         boxSizing: 'border-box',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        minWidth: 0
       }}
     >
       {/* Top row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
         <span style={{
           fontSize: '12px',
           fontWeight: 500,
           color: hovered ? accentHoverColor : '#6B7280',
-          transition: 'color 0.15s ease'
+          transition: 'color 0.15s ease',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}>
           {title}
         </span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
+          width="13"
+          height="13"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -185,17 +189,17 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
 
       {/* Middle value row */}
       <p style={{
-        marginTop: '8px',
+        marginTop: '4px',
         marginBottom: 0,
         display: 'flex',
         alignItems: 'baseline',
-        gap: '6px',
+        gap: '5px',
         overflow: 'hidden',
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis'
       }}>
         <span style={{
-          fontSize: '28px',
+          fontSize: '25px',
           fontWeight: 500,
           letterSpacing: '-0.025em',
           lineHeight: 1,
@@ -206,7 +210,7 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
         </span>
         {inlineStatus && (
           <span style={{
-            fontSize: '12px',
+            fontSize: '11.5px',
             fontWeight: 500,
             color: '#6B7280',
             overflow: 'hidden',
@@ -220,9 +224,9 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
 
       {/* Bottom row */}
       <p style={{
-        marginTop: '8px',
+        marginTop: '4px',
         marginBottom: 0,
-        fontSize: '12px',
+        fontSize: '11px',
         color: '#9CA3AF',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -519,6 +523,40 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         .tbl-row:hover > td { background:#F5F8FF !important; }
         .hdr-btn:hover { opacity:.82; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.14) !important; }
         .chip-btn:hover { opacity:.80; }
+        .kpi-row-4 {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+          width: 100%;
+        }
+        @media (max-width: 920px) {
+          .kpi-row-4 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+        }
+        @media (max-width: 480px) {
+          .kpi-row-4 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 8px;
+          }
+        }
+        .metric-strip-6 {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 8px;
+          width: 100%;
+        }
+        @media (max-width: 1060px) {
+          .metric-strip-6 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 580px) {
+          .metric-strip-6 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
       `}</style>
 
       {/* ═══ 1. DATE & ACTION BAR ════════════════════════════════════ */}
@@ -606,18 +644,14 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
       )}
 
-      {/* ═══ 2. PRIMARY KPI CARDS (Exact Requested MNC Style) ════════ */}
-      <div className="dash-row" style={{
-        display:'grid',
-        gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))',
-        gap:'14px'
-      }}>
+      {/* ═══ 2. PRIMARY KPI CARDS (4 Balanced Columns – Zero Blank Right Space) ════════ */}
+      <div className="dash-row kpi-row-4">
         {/* KPI 1 – Coverage */}
         <MncKpiCard
           title="Inspection coverage"
           value={`${coveragePct}%`}
           inlineStatus={`${pendingPositions} pending`}
-          bottomText={`${inspectedPositions} of ${totalPositions} permanent positions verified`}
+          bottomText={`${inspectedPositions} of ${totalPositions} positions verified`}
           onClick={() => setModalCategory('SLA')}
         />
 
@@ -626,7 +660,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           title="Cylinders due for HPT (CL-11)"
           value={hydroTests.length}
           inlineStatus="1 late"
-          bottomText="Statutory IS 2190 hydrostatic 35 Bar proof test"
+          bottomText="Statutory IS 2190 35 Bar proof test"
           onClick={() => setModalCategory('CL-11')}
         />
 
@@ -635,7 +669,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           title="Stock / Spares alerts"
           value={defectPositions.length}
           inlineStatus="2 low stock"
-          bottomText="Pressure gauges & delivery hose washer dispatches"
+          bottomText="Pressure gauges & washer dispatches"
           onClick={() => setModalCategory('DEFECTS')}
         />
 
@@ -644,15 +678,13 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           title="Contracted AMC positions"
           value={totalPositions}
           inlineStatus={`${sites.length} client plants`}
-          bottomText="Total permanent equipment positions under active AMC inspection"
+          bottomText="Total equipment positions under AMC"
           onClick={() => setModalCategory('CONTRACTS')}
         />
       </div>
 
-      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean - Click to Inspect Real Data) ═════ */}
-      <div className="dash-row" style={{
-        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:'8px'
-      }}>
+      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean - 6 Balanced Columns) ═════ */}
+      <div className="dash-row metric-strip-6">
         {[
           { 
             category: 'CL-11',
