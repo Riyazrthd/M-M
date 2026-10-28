@@ -35,6 +35,9 @@ async function runAllTests() {
   console.log('\n\n');
   const masterTests = await import('./src/utils/test_master_qr_workflow.js');
   await masterTests.runMasterQRTests();
+  console.log('\n\n');
+  const inspectionTests = await import('./src/utils/test_inspection_completion_workflow.js');
+  await inspectionTests.runInspectionCompletionTests();
 }
 
 runAllTests();

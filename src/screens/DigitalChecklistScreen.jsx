@@ -12,7 +12,8 @@ import {
   getQRRecordByToken,
   getChecklistSession,
   submitAssetObservation,
-  completeChecklistSession
+  completeChecklistSession,
+  getPendingAssetsForSite
 } from '../data/storage';
 import jsQR from 'jsqr';
 import { 
@@ -20,6 +21,10 @@ import {
   downloadChecklistExcel, 
   downloadMasterWorkbookExcel 
 } from '../utils/checklistExporter';
+import {
+  downloadPendingAssetsCSV,
+  downloadPendingAssetsExcel
+} from '../utils/pendingAssetExporter';
 import {
   downloadChecklistPDF,
   downloadChecklistStandaloneHTML
@@ -541,6 +546,13 @@ export default function DigitalChecklistScreen({
     !p.templateId || p.templateId === selectedTemplateId || template.targetType === p.equipmentCategory || template.targetType === p.equipmentType
   );
 
+  // Live Database-Backed Site Inspection Session Metrics (Requirements 1, 2, 3)
+  const siteAllPositions = getPositions(visit.siteId);
+  const pendingAssets = getPendingAssetsForSite(visit.siteId, visit.visitId);
+  const siteTotalAssets = siteAllPositions.length;
+  const siteInspectedAssets = siteTotalAssets - pendingAssets.length;
+  const siteProgressPct = siteTotalAssets > 0 ? Math.round((siteInspectedAssets / siteTotalAssets) * 100) : 0;
+
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -663,6 +675,176 @@ export default function DigitalChecklistScreen({
           </button>
         </div>
       </div>
+
+      {/* ═══ Smart Site Inspection Tracking Strip (Requirements 1, 2, 3) ═══ */}
+      <div style={{
+        backgroundColor: '#FFFFFF',
+        borderRadius: '10px',
+        border: '1.5px solid #E2E8F0',
+        padding: '14px 18px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+      }}>
+        {/* Left: Session identification */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            backgroundColor: '#EFF6FF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#2563EB',
+            flexShrink: 0
+          }}>
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0F172A' }}>
+                {activeSite?.clientName || activeSite?.name || visit.siteName}
+              </span>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                backgroundColor: '#F1F5F9',
+                color: '#475569'
+              }}>
+                WO: {visit.workOrderRef || activeSite?.poNumber || '—'}
+              </span>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '100px',
+                backgroundColor: '#ECFDF5',
+                color: '#059669',
+                border: '1px solid #A7F3D0'
+              }}>
+                ● Session Active
+              </span>
+            </div>
+            <div style={{ fontSize: '0.76rem', color: '#64748B', marginTop: '2px' }}>
+              Technician: <strong>{inspectingTechName}</strong> · Started: {visit.startDate || visit.date} at {visit.startTime || '09:00:00 AM'}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Live Progress & Completion Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Progress Counters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem' }}>
+            <span style={{ color: '#64748B' }}>
+              Total: <strong style={{ color: '#0F172A' }}>{siteTotalAssets}</strong>
+            </span>
+            <span style={{ color: '#64748B' }}>·</span>
+            <span style={{ color: '#059669' }}>
+              Inspected: <strong>{siteInspectedAssets}</strong>
+            </span>
+            <span style={{ color: '#64748B' }}>·</span>
+            <span style={{ color: pendingAssets.length > 0 ? '#DC2626' : '#64748B' }}>
+              Pending: <strong>{pendingAssets.length}</strong>
+            </span>
+            <span style={{
+              fontWeight: 800,
+              color: siteProgressPct === 100 ? '#059669' : '#2563EB',
+              marginLeft: '4px'
+            }}>
+              ({siteProgressPct}%)
+            </span>
+          </div>
+
+          <button
+            onClick={() => onNavigate('visit-summary')}
+            style={{
+              height: '36px',
+              padding: '0 14px',
+              borderRadius: '6px',
+              backgroundColor: '#0F172A',
+              color: '#FFFFFF',
+              border: 'none',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="Proceed to Site Inspection Sign-Off & Work Completion Validation"
+          >
+            <span>Proceed to Sign-Off</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Pending Asset Alert Banner with Download Action (Requirement 3) */}
+      {pendingAssets.length > 0 && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          backgroundColor: '#FFFBEB',
+          border: '1px solid #FCD34D',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} style={{ color: '#D97706', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#92400E' }}>
+              {pendingAssets.length} assets are still pending inspection.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={() => downloadPendingAssetsExcel({ site: activeSite, visit, pendingAssets })}
+              className="btn-outline"
+              style={{
+                height: '32px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                borderColor: '#F59E0B',
+                color: '#B45309',
+                backgroundColor: '#FFFFFF',
+                padding: '0 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Download remaining pending assets in Excel (.xlsx)"
+            >
+              <Download size={13} />
+              <span>Download Pending Asset List (.xlsx)</span>
+            </button>
+            <button
+              onClick={() => downloadPendingAssetsCSV({ site: activeSite, visit, pendingAssets })}
+              className="btn-outline"
+              style={{
+                height: '32px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                borderColor: '#F59E0B',
+                color: '#B45309',
+                backgroundColor: '#FFFFFF',
+                padding: '0 8px'
+              }}
+              title="Download pending asset list in CSV"
+            >
+              CSV
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Alert Notices */}
       {saveSuccessNotice && (

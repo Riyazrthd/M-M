@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, getPositions, getVisits, getCurrentUser, getQRRegistry } from '../data/storage';
+import { getSites, getPositions, getVisits, getCurrentUser, getQRRegistry, getPendingAssetsForSite, VALID_PENDING_REASONS } from '../data/storage';
 import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
+import { downloadPendingAssetsExcel, downloadPendingAssetsCSV } from '../utils/pendingAssetExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
   Building2, ShieldCheck, AlertTriangle, Calendar, CheckCircle2, 
@@ -755,12 +756,17 @@ function SectionHead({ icon: Icon, iconBg='linear-gradient(135deg,#1E3A8A,#2563E
 export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSelectPosition }) {
   const sites     = getSites();
   const positions = getPositions();
+  const visits    = getVisits();
   const user      = getCurrentUser();
 
   const [searchQuery,        setSearchQuery]        = useState('');
   const [statusFilter,       setStatusFilter]       = useState('ALL');
   const [isDownloadingMaster,setIsDownloadingMaster] = useState(false);
   const [downloadNotice,     setDownloadNotice]     = useState('');
+
+  // Site Inspection Audit state
+  const [selectedJustificationVisit, setSelectedJustificationVisit] = useState(null);
+  const [visitFilter, setVisitFilter] = useState('ALL');
 
   // Real Data Modal drill-down state
   const [modalCategory,      setModalCategory]      = useState(null);
@@ -1271,6 +1277,282 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                   </div>
                 );
               })}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ═══ 4B. SMART SITE INSPECTION TRACKING & SUPERVISOR AUDIT ═══ */}
+      <div className="dash-row">
+        <Card>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+            <SectionHead
+              icon={ShieldCheck}
+              iconBg="linear-gradient(135deg,#0D9488,#14B8A6)"
+              title="Site Inspection Tracking & Completion Audit"
+              sub="Live database tracking of AMC site inspections, pending assets, and mandatory exception validations"
+            />
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {[
+                { id: 'ALL', label: `All Sessions (${visits.length})` },
+                { id: 'ACTIVE', label: `Active (${visits.filter(v => v.status === 'In Progress' || v.status === 'Draft').length})` },
+                { id: 'EXCEPTIONS', label: `Exceptions (${visits.filter(v => v.status === 'Completed with Exceptions' || (v.pendingJustifications && Object.keys(v.pendingJustifications).length > 0)).length})` },
+                { id: 'COMPLETED', label: `Completed (${visits.filter(v => v.status === 'Completed').length})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setVisitFilter(tab.id)}
+                  style={{
+                    padding: '5px 11px',
+                    borderRadius: '7px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: visitFilter === tab.id ? '1px solid #0D9488' : `1px solid ${DS.border}`,
+                    backgroundColor: visitFilter === tab.id ? '#F0FDFA' : '#FFF',
+                    color: visitFilter === tab.id ? '#0F766E' : DS.textSec
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visits.length === 0 ? (
+            <div style={{
+              padding: '24px',
+              textAlign: 'center',
+              backgroundColor: '#FAFBFF',
+              borderRadius: '12px',
+              border: `1px solid ${DS.border}`,
+              color: DS.textMuted,
+              fontSize: '13px'
+            }}>
+              No site inspection sessions initiated yet. When a technician visits a site and scans the first asset QR code, an inspection session is automatically created here with real-time asset counters, pending tracking, and completion validation.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {visits
+                .filter(v => {
+                  if (visitFilter === 'ACTIVE') return v.status === 'In Progress' || v.status === 'Draft';
+                  if (visitFilter === 'EXCEPTIONS') return v.status === 'Completed with Exceptions' || (v.pendingJustifications && Object.keys(v.pendingJustifications).length > 0);
+                  if (visitFilter === 'COMPLETED') return v.status === 'Completed';
+                  return true;
+                })
+                .map((v) => {
+                  const s = sites.find(site => site.id === v.siteId || site.code === v.siteId);
+                  const siteTitle = s?.plantFacility || s?.name || v.siteName || v.siteId || 'Site Facility';
+                  const vId = v.visitId || v.id;
+                  const pendingList = getPendingAssetsForSite(v.siteId, vId);
+                  const sitePositions = positions.filter(p => p.siteId === v.siteId);
+                  const total = v.totalAssets || sitePositions.length || 0;
+                  const inspected = v.inspectedAssets !== undefined ? v.inspectedAssets : (total - pendingList.length);
+                  const pendingCount = v.pendingAssets !== undefined ? v.pendingAssets : pendingList.length;
+                  const pct = total > 0 ? Math.min(100, Math.round((inspected / total) * 100)) : 0;
+                  const justCount = v.pendingJustifications ? Object.keys(v.pendingJustifications).length : 0;
+
+                  const isCompleted = v.status === 'Completed';
+                  const isExceptions = v.status === 'Completed with Exceptions';
+                  const isInProgress = v.status === 'In Progress' || v.status === 'Draft';
+
+                  return (
+                    <div
+                      key={vId}
+                      style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: `1px solid ${DS.border}`,
+                        backgroundColor: '#FFFFFF',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}
+                    >
+                      {/* Top Header Row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: DS.textPrimary }}>
+                              {siteTitle}
+                            </span>
+                            <span style={{
+                              fontSize: '11px',
+                              fontFamily: 'monospace',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: '#F1F5F9',
+                              color: '#475569'
+                            }}>
+                              {v.workOrderRef || v.workOrder || 'WO-AMC-ACTIVE'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: DS.textMuted, marginTop: '3px' }}>
+                            Tech: <strong style={{ color: DS.textSec }}>{v.technician || v.inspectorName || 'Ramesh Patel'}</strong> · Started: {v.startedAt ? new Date(v.startedAt).toLocaleString() : (v.date || 'Today')}
+                            {v.completedAt && ` · Completed: ${new Date(v.completedAt).toLocaleString()}`}
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 10px',
+                            borderRadius: '100px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor: isInProgress ? '#E0F2FE' : isExceptions ? '#FEF3C7' : '#ECFDF5',
+                            color: isInProgress ? '#0369A1' : isExceptions ? '#B45309' : '#047857',
+                            border: `1px solid ${isInProgress ? '#BAE6FD' : isExceptions ? '#FDE68A' : '#A7F3D0'}`
+                          }}>
+                            {isInProgress && <LiveDot color="#0284C7" />}
+                            {isExceptions && <AlertTriangle size={12} />}
+                            {isCompleted && <CheckCircle2 size={12} />}
+                            {v.status || 'In Progress'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Middle Metrics & Progress Bar */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                        gap: '10px',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        backgroundColor: '#F8FAFC'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '11px', color: DS.textMuted }}>Total Assets</div>
+                          <div style={{ fontSize: '16px', fontWeight: 600, color: DS.textPrimary }}>{total}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#047857' }}>Inspected Assets</div>
+                          <div style={{ fontSize: '16px', fontWeight: 600, color: '#047857' }}>{inspected}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: pendingCount > 0 ? '#B45309' : DS.textMuted }}>Pending Assets</div>
+                          <div style={{ fontSize: '16px', fontWeight: 600, color: pendingCount > 0 ? '#B45309' : DS.textMuted }}>{pendingCount}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: DS.textMuted }}>Session Progress</div>
+                          <div style={{ fontSize: '16px', fontWeight: 600, color: '#0F766E' }}>{pct}%</div>
+                        </div>
+                      </div>
+
+                      {/* Progress bar line */}
+                      <div style={{ width: '100%', height: '6px', borderRadius: '4px', backgroundColor: '#E2E8F0', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${pct}%`,
+                          backgroundColor: pct === 100 ? '#059669' : pct >= 50 ? '#0D9488' : '#F59E0B',
+                          transition: 'width 0.4s ease'
+                        }} />
+                      </div>
+
+                      {/* Action Bar */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '4px' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {pendingCount > 0 ? (
+                            <>
+                              <button
+                                onClick={() => downloadPendingAssetsExcel({ site: s || { name: siteTitle, id: v.siteId }, visit: v, positions: pendingList })}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  backgroundColor: '#EFF6FF',
+                                  border: '1px solid #BFDBFE',
+                                  color: '#1D4ED8',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Download Pending Asset List in formatted Excel (.xlsx)"
+                              >
+                                <Download size={12} /> Pending List (.xlsx)
+                              </button>
+                              <button
+                                onClick={() => downloadPendingAssetsCSV({ site: s || { name: siteTitle, id: v.siteId }, visit: v, positions: pendingList })}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  backgroundColor: '#F8FAFC',
+                                  border: `1px solid ${DS.border}`,
+                                  color: DS.textSec,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Download Pending Asset List in CSV"
+                              >
+                                <FileSpreadsheet size={12} /> Pending List (.csv)
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <CheckCircle2 size={13} /> 100% Inspected (0 Pending)
+                            </span>
+                          )}
+
+                          {justCount > 0 && (
+                            <button
+                              onClick={() => setSelectedJustificationVisit(v)}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                backgroundColor: '#FFFBEB',
+                                border: '1px solid #FDE68A',
+                                color: '#92400E',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <AlertTriangle size={12} /> View Justifications ({justCount})
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => {
+                              if (s && onSelectSite) onSelectSite(s);
+                              onNavigate('digital-checklist');
+                            }}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              backgroundColor: '#0F766E',
+                              border: 'none',
+                              color: '#FFF',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            Open Checklist <ArrowRight size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </Card>
@@ -2457,6 +2739,207 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                   style={{
                     height: '30px',
                     padding: '0 14px',
+                    borderRadius: '6px',
+                    backgroundColor: '#FFF',
+                    border: '1px solid #D1D5DB',
+                    color: DS.textPrimary,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ JUSTIFICATION REVIEW MODAL ═══ */}
+      {selectedJustificationVisit && (() => {
+        const v = selectedJustificationVisit;
+        const s = sites.find(site => site.id === v.siteId || site.code === v.siteId);
+        const siteTitle = s?.plantFacility || s?.name || v.siteName || v.siteId;
+        const justEntries = Object.entries(v.pendingJustifications || {});
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+            onClick={() => setSelectedJustificationVisit(null)}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFF',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '820px',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '18px 20px',
+                borderBottom: `1px solid ${DS.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                backgroundColor: '#F8FAFC'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: '#FEF3C7',
+                      color: '#B45309',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: DS.textPrimary }}>
+                        Site Inspection Justifications & Exceptions Audit
+                      </h3>
+                      <p style={{ margin: 0, fontSize: '12px', color: DS.textMuted }}>
+                        {siteTitle} · {v.workOrderRef || v.workOrder || 'WO-AMC-ACTIVE'} · Tech: {v.technician || v.inspectorName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedJustificationVisit(null)}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    color: DS.textMuted,
+                    padding: '4px'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  marginBottom: '16px',
+                  fontSize: '12.5px',
+                  color: '#92400E'
+                }}>
+                  <strong>Mandatory Exception Log:</strong> The following {justEntries.length} uninspected assets were individually justified with documented operational reasons prior to sign-off.
+                </div>
+
+                {justEntries.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: DS.textMuted, fontSize: '13px' }}>
+                    No pending justifications recorded for this inspection session.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {justEntries.map(([posId, just], idx) => {
+                      const pos = positions.find(p => p.positionId === posId || p.id === posId) || {};
+                      return (
+                        <div
+                          key={posId}
+                          style={{
+                            padding: '12px 14px',
+                            borderRadius: '8px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#FFFFFF',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748B' }}>#{idx + 1}</span>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: DS.textPrimary }}>
+                                {pos.positionId || posId}
+                              </span>
+                              <span style={{ fontSize: '12px', color: DS.textSec }}>
+                                {pos.currentEquipment?.type || pos.equipmentType || 'Equipment Asset'}
+                              </span>
+                            </div>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: '#FEF3C7',
+                              color: '#92400E',
+                              border: '1px solid #FDE68A'
+                            }}>
+                              {just.reason}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '11.5px', color: DS.textMuted }}>
+                            Location: <strong>{pos.locationDescription || pos.location || pos.area || 'Facility Floor'}</strong>
+                            {pos.qrCode && ` · QR: ${pos.qrCode}`}
+                          </div>
+
+                          {just.explanation && (
+                            <div style={{
+                              marginTop: '4px',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              fontSize: '12px',
+                              color: '#334155',
+                              fontStyle: 'italic'
+                            }}>
+                              "{just.explanation}"
+                            </div>
+                          )}
+
+                          <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '2px' }}>
+                            Logged by {just.recordedBy || v.technician || 'Technician'} · {just.timestamp ? new Date(just.timestamp).toLocaleString() : 'Inspection completion'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: '12px 20px',
+                borderTop: `1px solid ${DS.border}`,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                backgroundColor: '#F8FAFC'
+              }}>
+                <button
+                  onClick={() => setSelectedJustificationVisit(null)}
+                  style={{
+                    height: '32px',
+                    padding: '0 16px',
                     borderRadius: '6px',
                     backgroundColor: '#FFF',
                     border: '1px solid #D1D5DB',

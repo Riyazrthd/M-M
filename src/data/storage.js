@@ -402,6 +402,36 @@ export function getPositionById(positionId) {
   return positions.find(p => p.positionId === positionId || p.qrCode === positionId) || null;
 }
 
+export function savePositions(positions) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions || []));
+    return true;
+  } catch (e) {
+    console.error('savePositions error:', e);
+    return false;
+  }
+}
+
+export function saveSites(sites) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites || []));
+    return true;
+  } catch (e) {
+    console.error('saveSites error:', e);
+    return false;
+  }
+}
+
+export function saveVisits(visits) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits || []));
+    return true;
+  } catch (e) {
+    console.error('saveVisits error:', e);
+    return false;
+  }
+}
+
 // ============================================================================
 // PERMANENT QR REGISTRY & BULK GENERATION MODULE (Modules 1, 2, 3)
 // Concurrency-safe, duplicate-free, permanent registry of all QR tokens
@@ -851,37 +881,368 @@ export function getVisitById(visitId) {
   return visits.find(v => v.visitId === visitId) || null;
 }
 
+export const VALID_PENDING_REASONS = [
+  'Asset not found at site',
+  'Asset inaccessible',
+  'Asset removed / shifted',
+  'Asset damaged or unsafe to inspect',
+  'Customer representative unavailable',
+  'Asset not available during visit',
+  'QR code missing or damaged',
+  'Asset not covered under current AMC',
+  'Other'
+];
+
 export function getActiveVisit(siteId = "SITE-AIL-001") {
   const visits = getVisits();
-  let visit = visits.find(v => v.siteId === siteId && v.status === "In Progress");
-  if (!visit) {
-    visit = {
-      visitId: `VISIT-${new Date().getFullYear()}-${siteId.replace('SITE-', '')}-01`,
-      siteId: siteId,
-      date: new Date().toISOString().substring(0, 10),
-      serviceEngineer: getCurrentUser().name,
-      technicianName: getCurrentUser().name,
-      technicianBadge: getCurrentUser().badge || 'IFS-SE-041',
-      supervisor: "Sanjay Sharma",
-      clientRepresentative: "Vikram Shah",
-      status: "In Progress",
-      checklistAnswers: {},
-      visitRemarks: "",
-      sparesReplaced: "",
-      pendingPoints: "",
-      technicianSignature: null,
-      clientSignature: null,
-      completedAt: null
-    };
-    visits.unshift(visit);
-    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  let visit = visits.find(v => v.siteId === siteId && (v.status === "In Progress" || v.status === "Draft"));
+  const sitePositions = getPositions(siteId);
+  const totalAssetsCount = sitePositions.length;
+
+  if (visit) {
+    // Dynamically calculate and refresh metrics from database records
+    const inspectedKeys = Object.keys(visit.checklistAnswers || {});
+    visit.totalAssets = totalAssetsCount;
+    visit.inspectedAssets = inspectedKeys.length;
+    visit.pendingAssets = Math.max(0, totalAssetsCount - inspectedKeys.length);
+    visit.progressPct = totalAssetsCount > 0 ? Math.round((inspectedKeys.length / totalAssetsCount) * 100) : 0;
+    return visit;
   }
+
+  // Create new active site inspection session
+  const sites = getSites();
+  const site = sites.find(s => s.id === siteId) || {};
+  const siteVisitsCount = visits.filter(v => v.siteId === siteId).length;
+  const seqStr = String(siteVisitsCount + 1).padStart(2, '0');
+  const cleanSiteCode = (site.code || site.id || 'SITE').replace('SITE-', '').replace(/[^A-Za-z0-9]/g, '');
+  const now = new Date();
+  const isoTimestamp = now.toISOString();
+  const dateStr = isoTimestamp.substring(0, 10);
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const currentUser = getCurrentUser();
+
+  const clientTitle = site.clientName || site.company || site.name || 'Industrial Plant Facility';
+  const workOrder = site.workOrderRef || site.poNumber || `WO-IFS-${now.getFullYear()}-${cleanSiteCode}`;
+
+  visit = {
+    id: `VISIT-${now.getFullYear()}-${cleanSiteCode}-${seqStr}`,
+    visitId: `VISIT-${now.getFullYear()}-${cleanSiteCode}-${seqStr}`,
+    siteId: siteId,
+    siteName: clientTitle,
+    customerName: clientTitle,
+    workOrderRef: workOrder,
+    poNumber: site.poNumber || '—',
+    date: dateStr,
+    startedAt: isoTimestamp,
+    startDate: dateStr,
+    startTime: timeStr,
+    completedAt: null,
+    completedDate: null,
+    completedTime: null,
+    serviceEngineer: currentUser.name || 'Ramesh Patel',
+    technicianName: currentUser.name || 'Ramesh Patel',
+    technicianBadge: currentUser.badge || 'IFS-SE-041',
+    technicianRole: currentUser.roleTitle || 'Lead Service Engineer',
+    supervisor: "Sanjay Sharma",
+    clientRepresentative: site.clientContact || "Vikram Shah",
+    status: "In Progress",
+    totalAssets: totalAssetsCount,
+    inspectedAssets: 0,
+    pendingAssets: totalAssetsCount,
+    progressPct: 0,
+    checklistAnswers: {},
+    pendingJustifications: {},
+    visitRemarks: "",
+    sparesReplaced: "",
+    pendingPoints: "",
+    technicianSignature: null,
+    clientSignature: null
+  };
+
+  visits.unshift(visit);
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  localStorage.setItem(STORAGE_KEYS.ACTIVE_VISIT_ID, visit.visitId);
+
   return visit;
 }
 
-export function saveChecklistResult(visitId, positionId, checklistData) {
+/**
+ * Returns actual pending assets scheduled for inspection at site
+ * that have not yet been inspected in the active inspection session.
+ */
+export function getPendingAssetsForSite(siteId, visitId = null) {
+  const sitePositions = getPositions(siteId);
+  const visits = getVisits();
+  let visit = null;
+  if (visitId) {
+    visit = visits.find(v => v.visitId === visitId);
+  }
+  if (!visit) {
+    visit = visits.find(v => v.siteId === siteId && v.status === 'In Progress') || visits.find(v => v.siteId === siteId) || null;
+  }
+
+  const inspectedKeys = new Set(Object.keys(visit?.checklistAnswers || {}));
+  const pending = sitePositions.filter(pos => !inspectedKeys.has(pos.positionId));
+
+  const sites = getSites();
+  const site = sites.find(s => s.id === siteId) || {};
+  const siteName = site.clientName || site.name || 'Site';
+
+  return pending.map((pos, idx) => ({
+    srNo: idx + 1,
+    positionId: pos.positionId,
+    id: pos.id || pos.positionId,
+    qrCode: pos.qrCode || `IFS-QR-${pos.positionId}`,
+    equipmentType: pos.equipmentType || pos.currentEquipment?.equipmentName || 'Fire Safety Equipment',
+    equipmentCategory: pos.equipmentCategory || pos.equipmentType || 'Fire Safety',
+    currentEquipment: pos.currentEquipment,
+    templateId: pos.templateId || 'CL-11',
+    area: pos.area || pos.locationDescription || 'Plant Area',
+    location: pos.location || 'Site Location',
+    customerName: siteName,
+    siteId: siteId,
+    inspectionStatus: 'Pending',
+    justification: visit?.pendingJustifications?.[pos.positionId] || null
+  }));
+}
+
+/**
+ * Performs database-level validation on whether an AMC site inspection can be completed
+ */
+export function validateSiteInspectionCompletion(visitId) {
+  const visits = getVisits();
+  const visit = visits.find(v => (v.visitId || v.id) === visitId);
+  if (!visit) {
+    return {
+      isValid: false,
+      error: 'Inspection session not found',
+      canComplete: false,
+      pendingCount: 0,
+      missingJustifications: []
+    };
+  }
+
+  const sitePositions = getPositions(visit.siteId);
+  const totalAssets = sitePositions.length;
+  const inspectedKeys = Object.keys(visit.checklistAnswers || {});
+  const inspectedAssets = inspectedKeys.length;
+  const pendingList = sitePositions.filter(p => !inspectedKeys.includes(p.positionId));
+  const pendingAssets = pendingList.length;
+  const progressPct = totalAssets > 0 ? Math.round((inspectedAssets / totalAssets) * 100) : 0;
+
+  // Scenario A: All assets inspected (Pending = 0)
+  if (pendingAssets === 0) {
+    return {
+      isValid: true,
+      canComplete: true,
+      isFullyInspected: true,
+      totalAssets,
+      inspectedAssets,
+      pendingAssets: 0,
+      pendingCount: 0,
+      progressPct: 100,
+      pendingList: [],
+      missingJustifications: [],
+      statusRecommendation: 'Completed',
+      recommendation: 'Completed'
+    };
+  }
+
+  // Scenario B: Some assets are pending
+  const existingJustifications = visit.pendingJustifications || {};
+  const missingJustifications = pendingList.filter(p => {
+    const just = existingJustifications[p.positionId];
+    if (!just || !just.reason || !just.reason.trim()) return true;
+    if (just.reason.startsWith('Other') && (!just.explanation || just.explanation.trim().length < 5)) return true;
+    return false;
+  });
+
+  const canComplete = missingJustifications.length === 0;
+
+  return {
+    isValid: true,
+    canComplete,
+    isFullyInspected: false,
+    totalAssets,
+    inspectedAssets,
+    pendingAssets,
+    pendingCount: pendingAssets,
+    progressPct,
+    pendingList,
+    missingJustifications,
+    statusRecommendation: canComplete ? 'Completed with Exceptions' : 'Blocked',
+    recommendation: canComplete ? 'Completed with Exceptions' : 'Blocked'
+  };
+}
+
+/**
+ * Saves or drafts pending asset justifications into the session
+ */
+export function savePendingAssetJustifications(visitId, justifications = {}) {
   const visits = getVisits();
   const vIndex = visits.findIndex(v => v.visitId === visitId);
+  if (vIndex === -1) return { success: false, error: 'Inspection session not found' };
+
+  if (!visits[vIndex].pendingJustifications) {
+    visits[vIndex].pendingJustifications = {};
+  }
+
+  const currentUser = getCurrentUser();
+  const now = new Date().toISOString();
+
+  Object.entries(justifications).forEach(([posId, entry]) => {
+    if (entry && (entry.reason || entry.remarks || entry.explanation)) {
+      visits[vIndex].pendingJustifications[posId] = {
+        reason: entry.reason || 'Other',
+        explanation: entry.explanation || entry.remarks || '',
+        remarks: entry.remarks || entry.explanation || '',
+        justifiedBy: currentUser.name || 'Technician',
+        justifiedAt: now
+      };
+    }
+  });
+
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  return { success: true, pendingJustifications: visits[vIndex].pendingJustifications };
+}
+
+/**
+ * Enforces the strict completion rule at the database level:
+ * - If all assets inspected -> "Completed"
+ * - If pending assets exist -> Requires justification for EVERY pending asset.
+ *   - If any missing -> BLOCKS completion.
+ *   - If all valid -> "Completed with Exceptions"
+ */
+export function completeSiteInspection(visitId, {
+  justifications = {},
+  technicianSignature = null,
+  clientSignature = null,
+  clientRepName = null,
+  technicianName = null,
+  technicianBadge = null,
+  visitRemarks = null,
+  sparesReplaced = null,
+  pendingPoints = null
+} = {}) {
+  const visits = getVisits();
+  const vIndex = visits.findIndex(v => (v.visitId || v.id) === visitId);
+  if (vIndex === -1) return { success: false, error: 'Inspection session not found.' };
+
+  const visit = visits[vIndex];
+  const sitePositions = getPositions(visit.siteId);
+  const totalAssets = sitePositions.length;
+  const inspectedKeys = Object.keys(visit.checklistAnswers || {});
+  const inspectedAssets = inspectedKeys.length;
+  const pendingList = sitePositions.filter(p => !inspectedKeys.includes(p.positionId));
+  const pendingAssets = pendingList.length;
+  const progressPct = totalAssets > 0 ? Math.round((inspectedAssets / totalAssets) * 100) : 0;
+
+  // Merge any passed justifications with already saved ones
+  const mergedJustifications = {
+    ...(visit.pendingJustifications || {}),
+    ...justifications
+  };
+
+  const now = new Date();
+  const isoTimestamp = now.toISOString();
+  const dateStr = isoTimestamp.substring(0, 10);
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const currentUser = getCurrentUser();
+  const resolvedTechName = technicianName || visit.technicianName || visit.serviceEngineer || currentUser.name || 'Ramesh Patel';
+  const resolvedTechBadge = technicianBadge || visit.technicianBadge || currentUser.badge || 'IFS-SE-041';
+
+  let finalStatus = 'Completed';
+
+  if (pendingAssets > 0) {
+    // Check justification for EVERY pending asset
+    const missing = [];
+    pendingList.forEach(pos => {
+      const just = mergedJustifications[pos.positionId];
+      if (!just || !just.reason || !just.reason.trim()) {
+        missing.push(pos);
+      } else if (just.reason.startsWith('Other') && (!just.explanation || just.explanation.trim().length < 5)) {
+        missing.push(pos);
+      }
+    });
+
+    if (missing.length > 0) {
+      return {
+        success: false,
+        error: `Mandatory completion blocked: ${missing.length} pending asset(s) do not have a valid justification. Individual justification is mandatory for EVERY pending asset before completion.`,
+        missingCount: missing.length,
+        missingPositions: missing.map(m => m.positionId)
+      };
+    }
+
+    finalStatus = 'Completed with Exceptions';
+  }
+
+  // Update visit record
+  visit.totalAssets = totalAssets;
+  visit.inspectedAssets = inspectedAssets;
+  visit.pendingAssets = pendingAssets;
+  visit.progressPct = progressPct;
+  visit.pendingJustifications = mergedJustifications;
+  visit.status = finalStatus;
+  visit.completedAt = isoTimestamp;
+  visit.completedDate = dateStr;
+  visit.completedTime = timeStr;
+
+  if (technicianSignature) visit.technicianSignature = technicianSignature;
+  if (clientSignature) visit.clientSignature = clientSignature;
+  if (clientRepName) visit.clientRepresentative = clientRepName;
+  if (resolvedTechName) {
+    visit.technicianName = resolvedTechName;
+    visit.serviceEngineer = resolvedTechName;
+  }
+  if (resolvedTechBadge) visit.technicianBadge = resolvedTechBadge;
+  if (visitRemarks !== null && visitRemarks !== undefined) visit.visitRemarks = visitRemarks;
+  if (sparesReplaced !== null && sparesReplaced !== undefined) visit.sparesReplaced = sparesReplaced;
+  if (pendingPoints !== null && pendingPoints !== undefined) visit.pendingPoints = pendingPoints;
+
+  // If both signatures present, mark signed timestamp
+  if (visit.technicianSignature && visit.clientSignature) {
+    visit.signedAt = isoTimestamp;
+    visit.signedDate = dateStr;
+    visit.signedTime = timeStr;
+  }
+
+  visits[vIndex] = visit;
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+
+  // Update site status
+  updateSiteProgress(visit.siteId);
+
+  queueSyncAction({
+    type: 'SITE_INSPECTION_COMPLETED',
+    visitId,
+    status: finalStatus,
+    totalAssets,
+    inspectedAssets,
+    pendingAssets,
+    timestamp: isoTimestamp
+  });
+
+  return {
+    success: true,
+    status: finalStatus,
+    visit,
+    totalAssets,
+    inspectedAssets,
+    pendingAssets,
+    progressPct
+  };
+}
+
+export function saveChecklistResult(visitId, positionId, checklistData) {
+  if (typeof visitId === 'object' && visitId !== null && !checklistData) {
+    const payload = visitId;
+    checklistData = payload;
+    positionId = payload.positionId || payload.id;
+    visitId = payload.visitId;
+  }
+  const visits = getVisits();
+  const vIndex = visits.findIndex(v => (v.visitId || v.id) === visitId);
   if (vIndex === -1) return { success: false, error: 'Visit not found' };
 
   if (!visits[vIndex].checklistAnswers) {
@@ -909,6 +1270,20 @@ export function saveChecklistResult(visitId, positionId, checklistData) {
     technicianBadge,
     technicianRole
   };
+
+  // If this position was previously pending and justified, clear the pending justification
+  if (visits[vIndex].pendingJustifications && visits[vIndex].pendingJustifications[positionId]) {
+    delete visits[vIndex].pendingJustifications[positionId];
+  }
+
+  // Recalculate live progress counts from database records
+  const sitePositions = getPositions(visits[vIndex].siteId);
+  const totalAssetsCount = sitePositions.length;
+  const inspectedAssetsCount = Object.keys(visits[vIndex].checklistAnswers).length;
+  visits[vIndex].totalAssets = totalAssetsCount;
+  visits[vIndex].inspectedAssets = inspectedAssetsCount;
+  visits[vIndex].pendingAssets = Math.max(0, totalAssetsCount - inspectedAssetsCount);
+  visits[vIndex].progressPct = totalAssetsCount > 0 ? Math.round((inspectedAssetsCount / totalAssetsCount) * 100) : 0;
 
   // Also update position's inspection status
   const positions = getPositions();
@@ -966,10 +1341,21 @@ export function updateSiteProgress(siteId) {
   const positions = getPositions(siteId);
   const total = positions.length;
   const inspected = positions.filter(p => p.inspectionStatus && p.inspectionStatus.startsWith('Inspected')).length;
+  const visits = getVisits();
+  const activeVisit = visits.find(v => v.siteId === siteId && (v.status === 'In Progress' || v.status === 'Completed with Exceptions' || v.status === 'Completed'));
+
+  let status = 'Scheduled';
+  if (activeVisit?.status === 'Completed with Exceptions') {
+    status = 'Completed with Exceptions';
+  } else if ((inspected >= total && total > 0) || activeVisit?.status === 'Completed') {
+    status = 'Completed';
+  } else if (inspected > 0 || activeVisit?.status === 'In Progress') {
+    status = 'In Progress';
+  }
 
   sites[sIndex].totalPositions = total;
   sites[sIndex].inspectedPositions = inspected;
-  sites[sIndex].status = (inspected >= total && total > 0) ? 'Completed' : (inspected > 0 ? 'In Progress' : 'Scheduled');
+  sites[sIndex].status = status;
 
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites));
 }
