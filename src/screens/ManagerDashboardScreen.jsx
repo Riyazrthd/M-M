@@ -1,43 +1,195 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getSites, getPositions, getVisits, getCurrentUser } from '../data/storage';
 import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
-  Building2, 
-  ShieldCheck, 
-  AlertTriangle, 
-  Calendar, 
-  CheckCircle2, 
-  TrendingUp, 
-  Users, 
-  FileCheck, 
-  ArrowRight, 
-  RefreshCw, 
-  BarChart3,
-  ExternalLink,
-  Search,
-  Filter,
-  Download,
-  PlusCircle,
-  QrCode,
-  Flame,
-  Clock,
-  ChevronRight,
-  Sparkles,
-  FileSpreadsheet,
-  Database
+  Building2, ShieldCheck, AlertTriangle, Calendar, CheckCircle2, 
+  TrendingUp, TrendingDown, FileCheck, ArrowRight, BarChart3,
+  ExternalLink, Search, Download, PlusCircle, QrCode, Flame,
+  Clock, ChevronRight, Sparkles, FileSpreadsheet, Database,
+  Activity, Zap, Target, AlertCircle, Check, Eye
 } from 'lucide-react';
 
-export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSelectPosition }) {
-  const sites = getSites();
-  const positions = getPositions();
-  const visits = getVisits();
-  const user = getCurrentUser();
+/* ─────────────────────────────────────────────────────────────────
+   PREMIUM MNC DESIGN TOKENS
+───────────────────────────────────────────────────────────────────*/
+const DS = {
+  navy:         '#0A0F1E',
+  navyLight:    '#111827',
+  crimson:      '#DC2626',
+  crimsonBg:    'rgba(220,38,38,0.10)',
+  sapphire:     '#2563EB',
+  sapphireBg:   'rgba(37,99,235,0.10)',
+  emerald:      '#059669',
+  emeraldBg:    'rgba(5,150,105,0.10)',
+  amber:        '#D97706',
+  amberBg:      'rgba(217,119,6,0.10)',
+  violet:       '#7C3AED',
+  violetBg:     'rgba(124,58,237,0.10)',
+  sky:          '#0284C7',
+  skyBg:        'rgba(2,132,199,0.10)',
+  textPrimary:  '#0A0F1E',
+  textSec:      '#4B5563',
+  textMuted:    '#9CA3AF',
+  border:       '#E2E8F0',
+  cardBg:       '#FFFFFF',
+  pageBg:       '#F0F2F7',
+  shadowSm:     '0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04)',
+  shadowMd:     '0 4px 14px rgba(0,0,0,0.08),0 2px 4px rgba(0,0,0,0.04)',
+  shadowLg:     '0 12px 32px rgba(0,0,0,0.10),0 4px 8px rgba(0,0,0,0.05)',
+  rMd:          '12px',
+  rLg:          '16px',
+};
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [isDownloadingMaster, setIsDownloadingMaster] = useState(false);
-  const [downloadNotice, setDownloadNotice] = useState('');
+/* ── Pure-SVG Donut Chart ─────────────────────────────────────── */
+function DonutChart({ percent, color, size = 76, strokeWidth = 7 }) {
+  const r = (size - strokeWidth) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - Math.min(percent, 100) / 100);
+  return (
+    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', display: 'block', flexShrink: 0 }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#E2E8F0" strokeWidth={strokeWidth}/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1)' }}/>
+    </svg>
+  );
+}
+
+/* ── Pure-SVG Mini Sparkline ─────────────────────────────────── */
+function Sparkline({ points = [], color = '#2563EB', width = 80, height = 30 }) {
+  if (points.length < 2) return null;
+  const max = Math.max(...points), min = Math.min(...points);
+  const range = max - min || 1;
+  const step = width / (points.length - 1);
+  const coords = points.map((v, i) => [
+    +(i * step).toFixed(1),
+    +(height - ((v - min) / range) * (height - 6) - 3).toFixed(1)
+  ]);
+  const line = coords.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${p[1]}`).join(' ');
+  const area = `${line} L${coords[coords.length-1][0]},${height} L0,${height} Z`;
+  const gradId = `sg${color.replace('#','')}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} fill="none" style={{ display:'block' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.2"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0.01"/>
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`}/>
+      <path d={line} stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+/* ── Segmented Progress Bar ──────────────────────────────────── */
+function BarSegments({ segments }) {
+  const total = segments.reduce((a, s) => a + s.value, 0) || 1;
+  return (
+    <div style={{ display:'flex', gap:'2px', borderRadius:'6px', overflow:'hidden', height:'7px' }}>
+      {segments.map((s, i) => (
+        <div key={i} style={{
+          width:`${(s.value/total)*100}%`, backgroundColor:s.color,
+          transition:'width 0.9s cubic-bezier(.4,0,.2,1)'
+        }} title={`${s.label}: ${s.value}`}/>
+      ))}
+    </div>
+  );
+}
+
+/* ── Pulsing Status Dot ──────────────────────────────────────── */
+function LiveDot({ color = '#059669' }) {
+  return (
+    <span style={{
+      display:'inline-block', width:'7px', height:'7px', borderRadius:'50%',
+      backgroundColor: color,
+      boxShadow:`0 0 0 2px ${color}44`,
+      animation: 'livePulse 2s infinite'
+    }}/>
+  );
+}
+
+/* ── Hoverable Card ─────────────────────────────────────────── */
+function Card({ children, style={}, onClick }) {
+  const [h, setH] = useState(false);
+  return (
+    <div onClick={onClick} onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+      style={{
+        backgroundColor: DS.cardBg, border:`1px solid ${h && onClick ? '#93C5FD' : DS.border}`,
+        borderRadius: DS.rLg, padding:'22px',
+        boxShadow: h && onClick ? DS.shadowLg : DS.shadowSm,
+        transition:'all 0.22s cubic-bezier(.4,0,.2,1)',
+        cursor: onClick ? 'pointer' : 'default',
+        transform: h && onClick ? 'translateY(-2px)' : 'translateY(0)',
+        ...style
+      }}>
+      {children}
+    </div>
+  );
+}
+
+/* ── Section Icon Header ─────────────────────────────────────── */
+function SectionHead({ icon: Icon, iconBg='linear-gradient(135deg,#1E3A8A,#2563EB)', title, sub, right }) {
+  return (
+    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'18px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+        {Icon && (
+          <div style={{
+            width:'34px', height:'34px', borderRadius:'10px', background:iconBg,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow:'0 4px 10px rgba(37,99,235,0.28)', flexShrink:0
+          }}>
+            <Icon size={16} color="#FFF"/>
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize:'14px', fontWeight:700, color:DS.textPrimary, letterSpacing:'-0.015em' }}>{title}</div>
+          {sub && <div style={{ fontSize:'11.5px', color:DS.textMuted, marginTop:'1px' }}>{sub}</div>}
+        </div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   MAIN DASHBOARD COMPONENT
+══════════════════════════════════════════════════════════════════ */
+export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSelectPosition }) {
+  const sites     = getSites();
+  const positions = getPositions();
+  const user      = getCurrentUser();
+
+  const [searchQuery,        setSearchQuery]        = useState('');
+  const [statusFilter,       setStatusFilter]       = useState('ALL');
+  const [isDownloadingMaster,setIsDownloadingMaster] = useState(false);
+  const [downloadNotice,     setDownloadNotice]     = useState('');
+
+  // KPI computations
+  const totalPositions     = sites.reduce((a, s) => a + (s.totalPositions || 0), 0);
+  const inspectedPositions = sites.reduce((a, s) => a + (s.inspectedPositions || 0), 0);
+  const coveragePct        = totalPositions > 0 ? Math.round((inspectedPositions / totalPositions) * 100) : 0;
+  const pendingPositions   = totalPositions - inspectedPositions;
+  const okPositions        = positions.filter(p => p.inspectionStatus === 'Inspected - OK').length;
+  const defectPositions    = positions.filter(p => p.inspectionStatus === 'Inspected - Attention');
+  const hydroTests         = positions.filter(p => p.templateId === 'CL-11' && p.currentEquipment?.nextHydroTestDue);
+  const totalExtinguishers = positions.filter(p => p.templateId === 'CL-11').length;
+  const totalHoseBoxes     = positions.filter(p => p.templateId === 'CL-03').length;
+
+  const filteredPositions = positions.filter(p => {
+    const q = searchQuery.toLowerCase();
+    const matchQ = !q ||
+      p.id.toLowerCase().includes(q) || p.qrCode.toLowerCase().includes(q) ||
+      p.locationDescription?.toLowerCase().includes(q) ||
+      p.currentEquipment?.serialNumber?.toLowerCase().includes(q);
+    const matchS = statusFilter === 'ALL' ||
+      (statusFilter === 'OK' && p.inspectionStatus === 'Inspected - OK') ||
+      (statusFilter === 'ATTENTION' && p.inspectionStatus === 'Inspected - Attention') ||
+      (statusFilter === 'PENDING' && (!p.inspectionStatus || p.inspectionStatus.includes('Pending')));
+    return matchQ && matchS;
+  });
 
   const handleDownloadMasterExcel = async () => {
     setIsDownloadingMaster(true);
@@ -47,835 +199,669 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         siteAddress: 'Plot 2201/2202, Jhagadia GIDC Industrial Estate, Bharuch, Gujarat 393110',
         poNumber: 'PO/AIL/AMC/2026/8812',
         workOrderRef: 'WO-IFSPL-2026-OCT-094',
-        dateOfService: new Date().toISOString().substring(0, 10).split('-').reverse().join('-'),
-        frequency: 'Quarterly',
-        monthPeriod: 'October – 2026',
+        dateOfService: new Date().toISOString().substring(0,10).split('-').reverse().join('-'),
+        frequency: 'Quarterly', monthPeriod: 'October – 2026',
         engineerName: user.name || 'Ramesh Patel',
-        supervisorName: 'Sanjay Sharma',
-        clientWitnessName: 'Vikram Shah'
+        supervisorName: 'Sanjay Sharma', clientWitnessName: 'Vikram Shah'
       });
-      setDownloadNotice('Master Control Copy (.xlsx with all 26 checklists) downloaded in exact workbook format without changes.');
+      setDownloadNotice('Master Control Copy (.xlsx with all 26 checklists) downloaded successfully.');
       setTimeout(() => setDownloadNotice(''), 5000);
-    } catch (err) {
-      console.error('Master download error:', err);
-    } finally {
-      setIsDownloadingMaster(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setIsDownloadingMaster(false); }
   };
 
-  // Dynamic calculations from actual records
-  const totalContractedPositions = sites.reduce((acc, s) => acc + (s.totalPositions || 0), 0);
-  const totalInspectedPositions = sites.reduce((acc, s) => acc + (s.inspectedPositions || 0), 0);
-  const overallCoveragePercent = totalContractedPositions > 0
-    ? Math.round((totalInspectedPositions / totalContractedPositions) * 100)
-    : 0;
-
-  const positionsWithDefects = positions.filter(p => p.inspectionStatus === 'Inspected - Attention');
-  const upcomingHydroTests = positions.filter(p => p.templateId === 'CL-11' && p.currentEquipment?.nextHydroTestDue);
-  const totalExtinguishers = positions.filter(p => p.templateId === 'CL-11').length;
-  const totalHoseBoxes = positions.filter(p => p.templateId === 'CL-03').length;
-
-  // Filtered equipment list for the bottom Makoro table
-  const filteredPositions = positions.filter(p => {
-    const matchesSearch = !searchQuery || 
-      p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.qrCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.locationDescription?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.currentEquipment?.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = statusFilter === 'ALL' ||
-      (statusFilter === 'OK' && p.inspectionStatus === 'Inspected - OK') ||
-      (statusFilter === 'ATTENTION' && p.inspectionStatus === 'Inspected - Attention') ||
-      (statusFilter === 'PENDING' && (!p.inspectionStatus || p.inspectionStatus.includes('Pending')));
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // CSV Export handler
   const handleExportCSV = () => {
-    const headers = ['Position ID', 'QR Code', 'Plant', 'Location', 'Category', 'Serial No', 'Template', 'Status'];
+    const hdr = ['Position ID','QR Code','Plant','Location','Category','Serial No','Template','Status'];
     const rows = filteredPositions.map(p => [
-      p.id,
-      p.qrCode,
-      p.siteId || 'AIL-U4',
-      `"${p.locationDescription || ''}"`,
-      p.equipmentCategory || '',
-      p.currentEquipment?.serialNumber || '',
-      p.templateId || '',
-      p.inspectionStatus || 'Pending'
+      p.id, p.qrCode, p.siteId || 'AIL-U4', `"${p.locationDescription||''}"`,
+      p.equipmentCategory||'', p.currentEquipment?.serialNumber||'',
+      p.templateId||'', p.inspectionStatus||'Pending'
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `indus_amc_equipment_export_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = 'data:text/csv;charset=utf-8,' + [hdr.join(','),...rows.map(r=>r.join(','))].join('\n');
+    const a = document.createElement('a');
+    a.href = encodeURI(csv);
+    a.download = `indus_amc_export_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const siteName = p => p.siteId === 'AIL-U4' ? 'Aarti Industries Ltd' : p.siteId === 'ATL-C2' ? 'Atul Ltd' : p.siteId === 'DNL-NDS' ? 'Deepak Nitrite' : 'L&T Hazira';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      
-      {/* 1. Makoro Greeting & Overview Row */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        flexWrap: 'wrap',
-        gap: '14px',
-        paddingBottom: '4px'
+    <div style={{ display:'flex', flexDirection:'column', gap:'18px' }}>
+
+      {/* Global keyframes */}
+      <style>{`
+        @keyframes livePulse {
+          0%,100% { box-shadow:0 0 0 2px rgba(5,150,105,.3); }
+          50%      { box-shadow:0 0 0 5px rgba(5,150,105,.08); }
+        }
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(8px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .dash-row  { animation: fadeUp 0.38s ease both; }
+        .dash-row:nth-child(1){animation-delay:.05s}
+        .dash-row:nth-child(2){animation-delay:.10s}
+        .dash-row:nth-child(3){animation-delay:.15s}
+        .dash-row:nth-child(4){animation-delay:.20s}
+        .dash-row:nth-child(5){animation-delay:.25s}
+        .dash-row:nth-child(6){animation-delay:.30s}
+        .dash-row:nth-child(7){animation-delay:.35s}
+        .tbl-row:hover > td { background:#F5F8FF !important; }
+        .hdr-btn:hover { opacity:.82; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.14) !important; }
+        .chip-btn:hover { opacity:.80; }
+      `}</style>
+
+      {/* ═══ 1. GREETING + ACTION ROW ═══════════════════════════════ */}
+      <div className="dash-row" style={{
+        display:'flex', justifyContent:'space-between', alignItems:'flex-start',
+        flexWrap:'wrap', gap:'14px', paddingBottom:'2px'
       }}>
         <div>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#111827', margin: '0 0 4px 0' }}>
-            Good morning
+          <h2 style={{ fontSize:'1.6rem', fontWeight:800, color:DS.textPrimary, margin:'0 0 4px 0', letterSpacing:'-0.035em' }}>
+            {greeting}, {user.name.split(' ')[0]} 👋
           </h2>
-          <p style={{ fontSize: '0.86rem', color: '#6B7280', margin: 0 }}>
-            Here's today's overview across Gujarat chemical & engineering industrial AMC contracts.
+          <p style={{ fontSize:'13px', color:DS.textSec, margin:0 }}>
+            Executive Operations · Gujarat Industrial AMC Contracts ·{' '}
+            {new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={() => {
-              downloadSQLBackupFile();
-              setDownloadNotice('Supabase SQL Backup file (.sql) downloaded. Ready to run in Supabase SQL Editor!');
-              setTimeout(() => setDownloadNotice(''), 6000);
-            }}
-            className="btn-outline"
+        <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
+          {[
+            {
+              label:'Supabase Backup', icon:<Database size={13}/>,
+              color:'#0369A1', border:'#BAE6FD', bg:'#F0F9FF',
+              action: () => { downloadSQLBackupFile(); setDownloadNotice('Supabase SQL Backup downloaded!'); setTimeout(()=>setDownloadNotice(''),5000); }
+            },
+            {
+              label: isDownloadingMaster ? 'Preparing…' : 'Master Excel (26 CLs)',
+              icon:<FileSpreadsheet size={13}/>,
+              color:'#1E3A8A', border:'#C7D2FE', bg:'#EEF2FF',
+              action: handleDownloadMasterExcel, disabled: isDownloadingMaster
+            }
+          ].map((b,i) => (
+            <button key={i} className="hdr-btn" onClick={b.action} disabled={b.disabled}
+              style={{
+                height:'36px', padding:'0 14px', borderRadius:'9px',
+                display:'flex', alignItems:'center', gap:'6px',
+                backgroundColor:b.bg, border:`1px solid ${b.border}`,
+                color:b.color, fontSize:'12.5px', fontWeight:600,
+                cursor:'pointer', opacity:b.disabled?.5:1,
+                boxShadow:DS.shadowSm, transition:'all 0.18s ease'
+              }}>
+              {b.icon} {b.label}
+            </button>
+          ))}
+
+          <button className="hdr-btn" onClick={() => onNavigate('asset-register')}
             style={{
-              height: '38px',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#FFFFFF',
-              borderColor: '#0284C7',
-              color: '#0284C7',
-              fontWeight: 600
-            }}
-            title="Download full Supabase PostgreSQL schema and data backup"
-          >
-            <Database size={15} />
-            <span>Supabase Backup (.sql)</span>
+              height:'36px', padding:'0 16px', borderRadius:'9px',
+              display:'flex', alignItems:'center', gap:'6px',
+              background:'linear-gradient(135deg,#111827,#374151)',
+              color:'#FFF', fontSize:'12.5px', fontWeight:700,
+              cursor:'pointer', border:'none',
+              boxShadow:'0 3px 10px rgba(17,24,39,.35)',
+              transition:'all 0.18s ease'
+            }}>
+            <PlusCircle size={13}/> Register Asset
           </button>
 
-          <button
-            onClick={handleDownloadMasterExcel}
-            disabled={isDownloadingMaster}
-            className="btn-outline"
+          <button className="hdr-btn" onClick={() => onNavigate('site-list')}
             style={{
-              height: '38px',
-              fontSize: '0.82rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: '#FFFFFF',
-              borderColor: '#1E3A8A',
-              color: '#1E3A8A',
-              fontWeight: 600
-            }}
-            title="Download complete Master Control Copy (.xlsx) containing all 26 checklists"
-          >
-            <FileSpreadsheet size={15} />
-            <span>{isDownloadingMaster ? 'Preparing .xlsx...' : 'Master Excel (26 Checklists)'}</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('asset-register')}
-            className="btn-primary"
-            style={{ height: '38px', fontSize: '0.84rem' }}
-          >
-            <PlusCircle size={15} />
-            <span>Register Asset</span>
-          </button>
-
-          <button
-            onClick={() => onNavigate('site-list')}
-            className="btn-outline"
-            style={{ height: '38px', fontSize: '0.84rem' }}
-          >
-            <span>View All Plants</span>
-            <ArrowRight size={14} />
+              height:'36px', padding:'0 14px', borderRadius:'9px',
+              display:'flex', alignItems:'center', gap:'5px',
+              backgroundColor:'#FFF', border:`1px solid ${DS.border}`,
+              color:DS.textSec, fontSize:'12.5px', fontWeight:500,
+              cursor:'pointer', boxShadow:DS.shadowSm,
+              transition:'all 0.18s ease'
+            }}>
+            View All Plants <ArrowRight size={12}/>
           </button>
         </div>
       </div>
 
-      {/* Master Download Notice */}
+      {/* Download notice */}
       {downloadNotice && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: '8px',
-          backgroundColor: '#EFF6FF',
-          color: '#1D4ED8',
-          border: '1px solid #BFDBFE',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '0.86rem',
-          fontWeight: 600
+        <div className="dash-row" style={{
+          padding:'11px 16px', borderRadius:'10px',
+          background:'linear-gradient(135deg,#EFF6FF,#DBEAFE)',
+          border:'1px solid #BFDBFE', color:'#1D4ED8',
+          display:'flex', alignItems:'center', gap:'10px',
+          fontSize:'13px', fontWeight:600
         }}>
-          <CheckCircle2 size={18} style={{ color: '#2563EB', flexShrink: 0 }} />
-          <span>{downloadNotice}</span>
+          <CheckCircle2 size={16} color="#2563EB"/> {downloadNotice}
         </div>
       )}
 
-      {/* 2. Top 4 Makoro Primary KPI Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px'
+      {/* ═══ 2. PRIMARY KPI CARDS ════════════════════════════════════ */}
+      <div className="dash-row" style={{
+        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'13px'
       }}>
-        {/* Card 1: Overall Inspection Coverage */}
-        <div 
-          onClick={() => onNavigate('site-list')}
-          className="kpi-card card-hover" 
-          style={{ padding: '20px 22px', cursor: 'pointer', position: 'relative' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#536174' }}>
-              Inspection coverage
-            </span>
-            <ExternalLink size={14} color="#788494" />
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '38px', fontWeight: 500, color: '#17191C', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-              {overallCoveragePercent}%
-            </span>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              backgroundColor: '#FEE2E2',
-              color: '#E00000',
-              border: '1px solid #FECACA'
-            }}>
-              {totalContractedPositions - totalInspectedPositions} pending
-            </span>
-          </div>
 
-          <div style={{ fontSize: '13px', color: '#788494', marginBottom: '10px' }}>
-            {totalInspectedPositions} of {totalContractedPositions} permanent positions verified
-          </div>
-
-          <div className="progress-container">
-            <div 
-              className="progress-fill" 
-              style={{ 
-                width: `${overallCoveragePercent}%`, 
-                backgroundColor: overallCoveragePercent === 100 ? '#00875A' : '#111827' 
-              }} 
-            />
-          </div>
-        </div>
-
-        {/* Card 2: Cylinders Due for HPT */}
-        <div 
-          onClick={() => onNavigate('digital-checklist')}
-          className="kpi-card card-hover" 
-          style={{ padding: '20px 22px', cursor: 'pointer', position: 'relative' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#536174' }}>
-              Cylinders due for HPT (CL-11)
-            </span>
-            <ExternalLink size={14} color="#788494" />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '38px', fontWeight: 500, color: '#17191C', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-              {upcomingHydroTests.length}
-            </span>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              backgroundColor: '#FEE2E2',
-              color: '#E00000',
-              border: '1px solid #FECACA'
-            }}>
-              1 late
-            </span>
-          </div>
-
-          <div style={{ fontSize: '13px', color: '#788494' }}>
-            Statutory IS 2190 hydrostatic 35 Bar proof test
-          </div>
-        </div>
-
-        {/* Card 3: Defect & Spares Alerts */}
-        <div 
-          onClick={() => onNavigate('photo-remarks')}
-          className="kpi-card card-hover" 
-          style={{ padding: '20px 22px', cursor: 'pointer', position: 'relative' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#536174' }}>
-              Stock / Spares alerts
-            </span>
-            <ExternalLink size={14} color="#788494" />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '38px', fontWeight: 500, color: '#17191C', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-              {positionsWithDefects.length}
-            </span>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              backgroundColor: '#FEF3C7',
-              color: '#B45309',
-              border: '1px solid #FDE68A'
-            }}>
-              2 low stock
-            </span>
-          </div>
-
-          <div style={{ fontSize: '13px', color: '#788494' }}>
-            Pressure gauges & delivery hose washer dispatches
-          </div>
-        </div>
-
-        {/* Card 4: Contracted AMC Positions */}
-        <div 
-          onClick={() => onNavigate('site-list')}
-          className="kpi-card card-hover" 
-          style={{ padding: '20px 22px', cursor: 'pointer', position: 'relative' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#536174' }}>
-              Contracted AMC positions
-            </span>
-            <ExternalLink size={14} color="#788494" />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '38px', fontWeight: 500, color: '#17191C', letterSpacing: '-0.025em', lineHeight: 1.1 }}>
-              {totalContractedPositions}
-            </span>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '6px',
-              backgroundColor: '#E6F4EA',
-              color: '#00875A',
-              border: '1px solid #A7F3D0'
-            }}>
-              {sites.length} client plants
-            </span>
-          </div>
-
-          <div style={{ fontSize: '13px', color: '#788494' }}>
-            Total permanent equipment positions under active AMC inspection
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Strip of 6 Secondary Metric Cards with Mini SVG Sparklines (Makoro Reference) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: '12px'
-      }}>
-        {/* Metric 1 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            Hydro Testing (CL-11)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>{totalExtinguishers} units</span>
-            {/* SVG Sparkline */}
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 18 L10 14 L18 19 L26 8 L34 12 L46 4" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600, marginTop: '4px' }}>
-            35 Bar test certified
-          </div>
-        </div>
-
-        {/* Metric 2 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            Delivery Hose Boxes (CL-03)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>{totalHoseBoxes} units</span>
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 12 L12 16 L22 6 L32 14 L40 10 L46 5" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#2563EB', fontWeight: 600, marginTop: '4px' }}>
-            All nozzles & lugs intact
-          </div>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            QR Permanent Anchors
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>17 tagged</span>
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 20 L12 15 L20 18 L30 10 L38 8 L46 3" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#7C3AED', fontWeight: 600, marginTop: '4px' }}>
-            Zero position ID drift
-          </div>
-        </div>
-
-        {/* Metric 4 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            Defect Rectification
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>87.5%</span>
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 14 L12 10 L22 18 L32 8 L40 12 L46 6" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#D97706', fontWeight: 600, marginTop: '4px' }}>
-            1 unit action pending
-          </div>
-        </div>
-
-        {/* Metric 5 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            Pressure Gauge Audits
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>94.2%</span>
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 18 L12 12 L24 16 L32 8 L40 6 L46 4" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600, marginTop: '4px' }}>
-            Green zone calibrated
-          </div>
-        </div>
-
-        {/* Metric 6 */}
-        <div className="saas-card" style={{ padding: '14px', backgroundColor: '#FFFFFF' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>
-            Field SLA Compliance
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#111827' }}>99.1%</span>
-            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
-              <path d="M2 16 L12 14 L22 10 L30 12 L38 6 L46 4" stroke="#0891B2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div style={{ fontSize: '0.68rem', color: '#0891B2', fontWeight: 600, marginTop: '4px' }}>
-            Zero safety breaches
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Two-Column Middle Section: Scheduled AMC Visits & Real-time Activity Feed */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-        gap: '16px'
-      }}>
-        {/* Column 1: Scheduled Work Orders */}
-        <div className="saas-card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={18} color="#DC2626" />
-              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#111827', margin: 0 }}>
-                Scheduled Plant AMC Work Orders
-              </h3>
+        {/* KPI 1 – Coverage */}
+        <Card onClick={() => onNavigate('site-list')}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
+                Inspection Coverage
+              </p>
+              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
+                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
+                  {coveragePct}%
+                </span>
+                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
+                  {pendingPositions} pending
+                </span>
+              </div>
+              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>
+                {inspectedPositions} / {totalPositions} positions verified
+              </p>
+              <BarSegments segments={[
+                { label:'OK',        value:okPositions,              color:DS.emerald },
+                { label:'Attention', value:defectPositions.length,   color:DS.crimson },
+                { label:'Pending',   value:pendingPositions,         color:'#E2E8F0'  },
+              ]}/>
             </div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: '#F3F4F6', color: '#4B5563' }}>
-              {sites.length} industrial plants
-            </span>
+            <div style={{ position:'relative', flexShrink:0, marginLeft:'12px' }}>
+              <DonutChart percent={coveragePct} color={coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson}/>
+              <div style={{
+                position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:'11px', fontWeight:800, color: coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson,
+                transform:'rotate(0deg)'
+              }}>{coveragePct}%</div>
+            </div>
           </div>
+        </Card>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* KPI 2 – HPT Due */}
+        <Card onClick={() => onNavigate('digital-checklist')}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
+            <div style={{ flex:1 }}>
+              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
+                Cylinders Due – HPT (CL-11)
+              </p>
+              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
+                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
+                  {hydroTests.length}
+                </span>
+                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
+                  1 overdue
+                </span>
+              </div>
+              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>IS 2190 hydrostatic 35 Bar proof test</p>
+              <Sparkline points={[3,5,4,7,6,9,hydroTests.length||9]} color={DS.crimson} width={100} height={26}/>
+            </div>
+            <div style={{
+              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
+              background:'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
+              border:'1px solid #FECACA',
+              display:'flex', alignItems:'center', justifyContent:'center'
+            }}>
+              <Flame size={20} color="#DC2626"/>
+            </div>
+          </div>
+        </Card>
+
+        {/* KPI 3 – Defect Alerts */}
+        <Card onClick={() => onNavigate('photo-remarks')}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
+            <div style={{ flex:1 }}>
+              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
+                Active Defect Alerts
+              </p>
+              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
+                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
+                  {defectPositions.length}
+                </span>
+                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEF3C7', color:'#D97706' }}>
+                  2 low stock
+                </span>
+              </div>
+              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>Pressure gauges & hose washer dispatches</p>
+              <Sparkline points={[1,3,2,4,2,3,defectPositions.length||1]} color={DS.amber} width={100} height={26}/>
+            </div>
+            <div style={{
+              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
+              background:'linear-gradient(135deg,#FFFBEB,#FEF3C7)',
+              border:'1px solid #FDE68A',
+              display:'flex', alignItems:'center', justifyContent:'center'
+            }}>
+              <AlertTriangle size={20} color="#D97706"/>
+            </div>
+          </div>
+        </Card>
+
+        {/* KPI 4 – Total Positions */}
+        <Card onClick={() => onNavigate('site-list')}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
+            <div style={{ flex:1 }}>
+              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
+                Contracted AMC Positions
+              </p>
+              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
+                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
+                  {totalPositions}
+                </span>
+                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#ECFDF5', color:'#059669' }}>
+                  {sites.length} plants
+                </span>
+              </div>
+              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>QR-tagged positions under active AMC</p>
+              <Sparkline points={[12,14,14,16,17,18,totalPositions||18]} color={DS.emerald} width={100} height={26}/>
+            </div>
+            <div style={{
+              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
+              background:'linear-gradient(135deg,#ECFDF5,#D1FAE5)',
+              border:'1px solid #A7F3D0',
+              display:'flex', alignItems:'center', justifyContent:'center'
+            }}>
+              <Building2 size={20} color="#059669"/>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ═══ 3. SECONDARY METRIC STRIP ═══════════════════════════════ */}
+      <div className="dash-row" style={{
+        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))', gap:'10px'
+      }}>
+        {[
+          { label:'Hydro Testing (CL-11)',  value:`${totalExtinguishers} units`, sub:'35 Bar certified',   color:DS.emerald, pts:[4,5,6,5,7,7,totalExtinguishers||6] },
+          { label:'Hose Boxes (CL-03)',     value:`${totalHoseBoxes} units`,    sub:'Nozzles & lugs OK',  color:DS.sapphire,pts:[2,2,3,4,3,4,totalHoseBoxes||4]   },
+          { label:'QR Permanent Anchors',   value:'17 tagged',  sub:'Zero ID drift',     color:DS.violet,  pts:[10,12,13,14,15,16,17]                              },
+          { label:'Defect Rectification',   value:'87.5%',      sub:'1 action pending',  color:DS.amber,   pts:[70,75,80,78,85,87,87.5]                            },
+          { label:'Pressure Gauge Audits',  value:'94.2%',      sub:'Green zone calib.',  color:DS.emerald, pts:[88,90,92,91,93,94,94.2]                           },
+          { label:'Field SLA Compliance',   value:'99.1%',      sub:'Zero safety breach', color:DS.sky,    pts:[97,98,98,99,99,99,99.1]                            },
+        ].map((m,i) => (
+          <div key={i} style={{
+            backgroundColor:DS.cardBg, border:`1px solid ${DS.border}`,
+            borderRadius:DS.rMd, padding:'14px 16px', boxShadow:DS.shadowSm
+          }}>
+            <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 6px 0', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+              {m.label}
+            </p>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+              <div>
+                <div style={{ fontSize:'20px', fontWeight:800, color:DS.textPrimary, letterSpacing:'-0.025em' }}>{m.value}</div>
+                <div style={{ fontSize:'10.5px', color:m.color, fontWeight:600, marginTop:'2px' }}>{m.sub}</div>
+              </div>
+              <Sparkline points={m.pts} color={m.color} width={50} height={24}/>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ═══ 4. TWO-COLUMN MIDDLE BLOCK ══════════════════════════════ */}
+      <div className="dash-row" style={{
+        display:'grid', gridTemplateColumns:'1.15fr 1fr', gap:'13px'
+      }}>
+
+        {/* Left – Scheduled Work Orders */}
+        <Card>
+          <SectionHead
+            icon={Calendar}
+            title="Scheduled Plant AMC Work Orders"
+            sub="Active inspection work orders across all contracted sites"
+            right={
+              <span style={{ fontSize:'10.5px', fontWeight:700, padding:'3px 10px', borderRadius:'100px', backgroundColor:'#EEF2FF', color:'#4338CA', border:'1px solid #C7D2FE' }}>
+                {sites.length} plants
+              </span>
+            }
+          />
+          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
             {sites.map(site => {
-              const percent = site.totalPositions > 0
-                ? Math.round((site.inspectedPositions / site.totalPositions) * 100)
-                : 0;
-
+              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
+              const done = pct === 100;
               return (
-                <div 
-                  key={site.id}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#F9FAFB',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px'
-                  }}
-                >
-                  <div style={{ overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#111827' }}>{site.name}</span>
+                <div key={site.id} style={{
+                  padding:'12px 14px', borderRadius:'10px',
+                  border:`1px solid ${DS.border}`,
+                  background: done ? 'linear-gradient(135deg,#F0FDF4,#ECFDF5)' : '#FAFBFF',
+                  display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px'
+                }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'7px', marginBottom:'3px' }}>
+                      <span style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary }}>{site.name}</span>
                       <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: percent === 100 ? '#D1FAE5' : '#FEF3C7',
-                        color: percent === 100 ? '#059669' : '#D97706'
+                        fontSize:'10px', fontWeight:700, padding:'1.5px 7px', borderRadius:'100px',
+                        backgroundColor:done?'#D1FAE5':'#FEF3C7', color:done?'#059669':'#D97706'
                       }}>
-                        {site.status}
+                        {done ? '✓ Complete' : site.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.74rem', color: '#6B7280', marginTop: '2px' }}>
-                      {site.city} • PO: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{site.poNumber}</span> • <span style={{ color: '#00875A', fontWeight: 600 }}>{site.amcType || site.frequency || 'Quarterly'} ({site.noOfVisits || 4} Visits)</span> • Exp: {site.amcExpiryDate || '—'} • Coverage: {percent}% ({site.inspectedPositions}/{site.totalPositions})
+                    <p style={{ fontSize:'11px', color:DS.textMuted, margin:'0 0 8px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {site.city} · PO {site.poNumber} · {site.amcType||'Quarterly'} · Exp {site.amcExpiryDate||'—'}
+                    </p>
+                    <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                      <div style={{ flex:1, height:'5px', borderRadius:'100px', backgroundColor:'#E2E8F0', overflow:'hidden' }}>
+                        <div style={{
+                          height:'100%', borderRadius:'100px', width:`${pct}%`,
+                          background: done ? 'linear-gradient(90deg,#059669,#34D399)' : 'linear-gradient(90deg,#2563EB,#60A5FA)',
+                          transition:'width 0.9s cubic-bezier(.4,0,.2,1)'
+                        }}/>
+                      </div>
+                      <span style={{ fontSize:'10.5px', fontWeight:700, color:done?DS.emerald:DS.sapphire, minWidth:'28px', textAlign:'right' }}>
+                        {pct}%
+                      </span>
                     </div>
                   </div>
-
                   <button
-                    onClick={() => {
-                      if (onSelectSite) onSelectSite(site);
-                      onNavigate('qr-scanner');
-                    }}
-                    className="btn-outline"
-                    style={{ height: '32px', minHeight: '32px', fontSize: '0.78rem', padding: '0 10px', flexShrink: 0 }}
-                  >
-                    <span>Inspect</span>
-                    <ArrowRight size={13} />
+                    onClick={() => { if(onSelectSite) onSelectSite(site); onNavigate('qr-scanner'); }}
+                    style={{
+                      height:'30px', padding:'0 12px', borderRadius:'7px', flexShrink:0,
+                      display:'flex', alignItems:'center', gap:'4px',
+                      background:'linear-gradient(135deg,#1E3A8A,#2563EB)',
+                      color:'#FFF', fontSize:'11.5px', fontWeight:700,
+                      border:'none', cursor:'pointer',
+                      boxShadow:'0 2px 6px rgba(37,99,235,.35)',
+                      transition:'all 0.18s ease'
+                    }}>
+                    Inspect <ChevronRight size={11}/>
                   </button>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Card>
 
-        {/* Column 2: Live Activity Stream / Inspection Dispatches */}
-        <div className="saas-card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={18} color="#2563EB" />
-              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: '#111827', margin: 0 }}>
-                Live Field Inspection Dispatch Stream
-              </h3>
-            </div>
-            <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>
-              ● Real-time
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669', marginTop: '6px', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827' }}>
-                  POS-AIL-001 Cylinder Replaced
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-                  Permanent QR <span style={{ fontFamily: 'monospace' }}>QR-POS-AIL-001</span> retained. Replacement unit IFS-2023-ABC-9901 linked.
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#9CA3AF', marginTop: '2px' }}>15 mins ago by Ramesh Patel</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB', marginTop: '6px', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827' }}>
-                  CL-11 Hydro Testing Passed (35 Bar)
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-                  POS-AIL-002 tested for 3 mins. Zero pressure drop or body distortion observed.
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#9CA3AF', marginTop: '2px' }}>45 mins ago • SOP/011 compliant</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#D97706', marginTop: '6px', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827' }}>
-                  Defect Flagged: Hose Box Gland Packing
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-                  POS-ATL-003 minor leak identified. Photo evidence recorded; spare washer requisitioned.
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#9CA3AF', marginTop: '2px' }}>1 hour ago at Atul Ltd Site</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#059669', marginTop: '6px', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827' }}>
-                  Client Sign-Off Completed
-                </div>
-                <div style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-                  Dual technician & plant safety officer digital signature recorded.
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#9CA3AF', marginTop: '2px' }}>2 hours ago by Rajesh Mehta</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Bottom Makoro-Style Full-Width Table with Search, Filter & CSV Export */}
-      <div className="saas-card" style={{ padding: '20px' }}>
-        
-        {/* Table Header with Search, Filter & Export */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '16px'
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#111827', margin: 0 }}>
-                Equipment Position Inventory & Status
-              </h3>
-              <span style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '9999px',
-                backgroundColor: '#F3F4F6',
-                color: '#4B5563'
-              }}>
-                {filteredPositions.length} positions
+        {/* Right – Live Activity Feed */}
+        <Card>
+          <SectionHead
+            icon={Activity}
+            iconBg="linear-gradient(135deg,#059669,#10B981)"
+            title="Live Field Activity Stream"
+            sub="Real-time inspection dispatch feed"
+            right={
+              <span style={{ display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', fontWeight:600, color:DS.emerald }}>
+                <LiveDot color={DS.emerald}/> Live
               </span>
-            </div>
-            <p style={{ fontSize: '0.78rem', color: '#6B7280', margin: '2px 0 0 0' }}>
-              Permanent QR tagged positions across contracted industrial plants
-            </p>
+            }
+          />
+          <div style={{ display:'flex', flexDirection:'column' }}>
+            {[
+              { color:DS.emerald, icon:Check,       title:'POS-AIL-001 Cylinder Replaced',      desc:'Permanent QR QR-POS-AIL-001 retained. Replacement IFS-2023-ABC-9901 linked.', time:'15 min ago · Ramesh Patel' },
+              { color:DS.sapphire,icon:ShieldCheck, title:'CL-11 Hydro Test Passed (35 Bar)',    desc:'POS-AIL-002 tested 3 mins. Zero pressure drop or body distortion observed.',  time:'45 min ago · SOP/011 compliant' },
+              { color:DS.amber,   icon:AlertCircle, title:'Defect Flagged: Hose Box Gland',      desc:'POS-ATL-003 minor leak identified. Photo evidence recorded; spare requisitioned.', time:'1 hr ago · Atul Ltd Site' },
+              { color:DS.emerald, icon:FileCheck,   title:'Client Sign-Off Completed',            desc:'Dual technician & plant safety officer digital signature recorded.',          time:'2 hr ago · Rajesh Mehta' },
+              { color:DS.violet,  icon:QrCode,      title:'Bulk QR Labels Generated',             desc:'50 permanent QR anchors generated for Deepak Nitrite Unit. Registry updated.', time:'3 hr ago · System' },
+            ].map((ev, i, arr) => {
+              const Icon = ev.icon;
+              return (
+                <div key={i} style={{
+                  display:'flex', gap:'11px',
+                  paddingBottom: i < arr.length-1 ? '13px' : 0,
+                  marginBottom:  i < arr.length-1 ? '13px' : 0,
+                  borderBottom:  i < arr.length-1 ? `1px dashed ${DS.border}` : 'none'
+                }}>
+                  <div style={{
+                    width:'30px', height:'30px', borderRadius:'8px', flexShrink:0,
+                    backgroundColor:`${ev.color}18`, border:`1px solid ${ev.color}30`,
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                  }}>
+                    <Icon size={14} color={ev.color}/>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary, marginBottom:'2px' }}>{ev.title}</div>
+                    <div style={{ fontSize:'11.5px', color:DS.textSec, lineHeight:1.5, marginBottom:'3px' }}>{ev.desc}</div>
+                    <div style={{ fontSize:'10.5px', color:DS.textMuted }}>{ev.time}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          {/* Search, Filter & Export controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Search Input */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0 10px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: '#F9FAFB',
-              border: '1px solid #E5E7EB',
-              width: '210px'
-            }}>
-              <Search size={14} color="#6B7280" />
-              <input
-                type="text"
-                placeholder="Search equipment, tag..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '0.8rem',
-                  backgroundColor: 'transparent',
-                  width: '100%',
-                  color: '#111827'
-                }}
-              />
-            </div>
-
-            {/* Filter Dropdown */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                height: '36px',
-                minHeight: '36px',
-                padding: '0 10px',
-                borderRadius: '8px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                fontSize: '0.8rem',
-                color: '#111827',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="OK">Inspected - OK</option>
-              <option value="ATTENTION">Attention / Defect</option>
-              <option value="PENDING">Pending Inspection</option>
-            </select>
-
-            {/* CSV Export Button */}
-            <button
-              onClick={handleExportCSV}
-              className="btn-outline"
-              style={{ height: '36px', minHeight: '36px', fontSize: '0.8rem', padding: '0 12px' }}
-              title="Download CSV export"
-            >
-              <Download size={14} />
-              <span>Export</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Table Content */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
-            <thead>
-              <tr style={{
-                backgroundColor: '#F9FAFB',
-                textAlign: 'left',
-                borderBottom: '1px solid #E5E7EB',
-                color: '#6B7280',
-                fontSize: '0.74rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em'
-              }}>
-                <th style={{ padding: '10px 14px' }}>Position ID & QR Tag</th>
-                <th style={{ padding: '10px 14px' }}>Plant & Location</th>
-                <th style={{ padding: '10px 14px' }}>Equipment Specs</th>
-                <th style={{ padding: '10px 14px' }}>SOP Template</th>
-                <th style={{ padding: '10px 14px' }}>Inspection Status</th>
-                <th style={{ padding: '10px 14px', textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPositions.map(pos => {
-                const isOK = pos.inspectionStatus === 'Inspected - OK';
-                const isAttention = pos.inspectionStatus === 'Inspected - Attention';
-
-                return (
-                  <tr 
-                    key={pos.id}
-                    style={{ borderBottom: '1px solid #E5E7EB', transition: 'background-color 0.1s ease' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    {/* Position ID & Permanent QR Tag */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#111827' }}>{pos.id}</div>
-                      <div style={{
-                        fontSize: '0.7rem',
-                        color: '#4B5563',
-                        fontFamily: 'monospace',
-                        backgroundColor: '#F3F4F6',
-                        padding: '1px 5px',
-                        borderRadius: '4px',
-                        display: 'inline-block',
-                        marginTop: '2px'
-                      }}>
-                        {pos.qrCode}
-                      </div>
-                    </td>
-
-                    {/* Plant & Location */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>
-                        {pos.siteId === 'AIL-U4' ? 'Aarti Industries Ltd' : pos.siteId === 'ATL-C2' ? 'Atul Ltd' : pos.siteId === 'DNL-NDS' ? 'Deepak Nitrite' : 'L&T Hazira'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                        {pos.locationDescription}
-                      </div>
-                    </td>
-
-                    {/* Equipment Specs */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ color: '#111827', fontWeight: 500 }}>
-                        {pos.currentEquipment?.type || pos.equipmentCategory}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-                        Serial: {pos.currentEquipment?.serialNumber || 'N/A'} • {pos.currentEquipment?.capacity || 'Standard'}
-                      </div>
-                    </td>
-
-                    {/* Assigned SOP Template */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        backgroundColor: pos.templateId === 'CL-11' ? '#EFF6FF' : '#FEF3C7',
-                        color: pos.templateId === 'CL-11' ? '#2563EB' : '#D97706',
-                        border: '1px solid #E5E7EB'
-                      }}>
-                        {pos.templateId}
-                      </span>
-                    </td>
-
-                    {/* Status */}
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: '9999px',
-                        backgroundColor: isOK ? '#D1FAE5' : isAttention ? '#FEE2E2' : '#F3F4F6',
-                        color: isOK ? '#059669' : isAttention ? '#DC2626' : '#6B7280'
-                      }}>
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: isOK ? '#059669' : isAttention ? '#DC2626' : '#6B7280'
-                        }} />
-                        {pos.inspectionStatus || 'Pending'}
-                      </span>
-                    </td>
-
-                    {/* Action */}
-                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => {
-                          if (onSelectPosition) onSelectPosition(pos);
-                          onNavigate('asset-details');
-                        }}
-                        className="btn-outline"
-                        style={{ height: '32px', minHeight: '32px', padding: '0 10px', fontSize: '0.78rem' }}
-                      >
-                        View Dossier
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        </Card>
       </div>
 
-      {/* 6. Truthful Architecture Status Footer Card */}
-      <div style={{
-        padding: '14px 18px',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '10px',
-        border: '1px solid #E5E7EB',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px'
+      {/* ═══ 5. SITE COVERAGE ANALYTICS GRID ════════════════════════ */}
+      <div className="dash-row">
+        <Card>
+          <SectionHead
+            icon={Target}
+            iconBg="linear-gradient(135deg,#7C3AED,#A855F7)"
+            title="Site-by-Site Coverage Analytics"
+            sub="Inspection penetration across all contracted industrial plants"
+          />
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(195px,1fr))', gap:'11px' }}>
+            {sites.map(site => {
+              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
+              const col = pct===100 ? DS.emerald : pct>=50 ? DS.sapphire : DS.crimson;
+              return (
+                <div key={site.id} style={{
+                  padding:'15px', borderRadius:'12px',
+                  border:`1px solid ${DS.border}`, backgroundColor:'#FAFBFF',
+                  display:'flex', flexDirection:'column', gap:'10px'
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary }}>{site.name}</div>
+                      <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
+                    </div>
+                    <span style={{ fontSize:'22px', fontWeight:800, color:col, letterSpacing:'-0.03em' }}>{pct}%</span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                    <div style={{ position:'relative', flexShrink:0 }}>
+                      <DonutChart percent={pct} color={col} size={52} strokeWidth={6}/>
+                      <div style={{
+                        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:'9px', fontWeight:800, color:col
+                      }}>
+                        {site.inspectedPositions}/{site.totalPositions}
+                      </div>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      {[
+                        { label:'Inspected', val:site.inspectedPositions,                    color:col      },
+                        { label:'Pending',   val:site.totalPositions-site.inspectedPositions, color:'#E2E8F0' },
+                      ].map((it,j) => (
+                        <div key={j} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:DS.textSec, marginBottom:'3px' }}>
+                          <span style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                            <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:it.color, display:'inline-block' }}/>
+                            {it.label}
+                          </span>
+                          <strong style={{ color:DS.textPrimary }}>{it.val}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+
+      {/* ═══ 6. FULL-WIDTH EQUIPMENT TABLE ═══════════════════════════ */}
+      <div className="dash-row">
+        <Card style={{ padding:'22px' }}>
+
+          {/* Table toolbar */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px', marginBottom:'18px' }}>
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:'9px' }}>
+                <div style={{
+                  width:'32px', height:'32px', borderRadius:'9px',
+                  background:'linear-gradient(135deg,#1E3A8A,#2563EB)',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  boxShadow:'0 3px 8px rgba(37,99,235,.28)'
+                }}>
+                  <BarChart3 size={15} color="#FFF"/>
+                </div>
+                <h3 style={{ fontSize:'14px', fontWeight:700, color:DS.textPrimary, margin:0, letterSpacing:'-0.015em' }}>
+                  Equipment Position Inventory
+                </h3>
+                <span style={{ fontSize:'11px', fontWeight:700, padding:'2px 9px', borderRadius:'100px', backgroundColor:'#EEF2FF', color:'#4338CA', border:'1px solid #C7D2FE' }}>
+                  {filteredPositions.length} positions
+                </span>
+              </div>
+              <p style={{ fontSize:'11.5px', color:DS.textMuted, margin:'4px 0 0 41px' }}>
+                Permanent QR-tagged assets across contracted industrial plants
+              </p>
+            </div>
+
+            <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
+              <div style={{
+                display:'flex', alignItems:'center', gap:'6px',
+                padding:'0 10px', height:'34px', borderRadius:'8px',
+                backgroundColor:'#F8FAFC', border:`1px solid ${DS.border}`, width:'195px'
+              }}>
+                <Search size={13} color={DS.textMuted}/>
+                <input type="text" placeholder="Search equipment, tag…" value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{ border:'none', outline:'none', fontSize:'12px', backgroundColor:'transparent', width:'100%', color:DS.textPrimary }}
+                />
+              </div>
+
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                style={{ height:'34px', padding:'0 10px', borderRadius:'8px', backgroundColor:'#FFF', border:`1px solid ${DS.border}`, fontSize:'12px', color:DS.textPrimary, cursor:'pointer' }}>
+                <option value="ALL">All Statuses</option>
+                <option value="OK">Inspected – OK</option>
+                <option value="ATTENTION">Needs Attention</option>
+                <option value="PENDING">Pending</option>
+              </select>
+
+              <button onClick={handleExportCSV}
+                style={{
+                  height:'34px', padding:'0 12px', borderRadius:'8px',
+                  display:'flex', alignItems:'center', gap:'5px',
+                  backgroundColor:'#FFF', border:`1px solid ${DS.border}`,
+                  color:DS.textSec, fontSize:'12px', fontWeight:500,
+                  cursor:'pointer', boxShadow:DS.shadowSm
+                }}>
+                <Download size={13}/> Export CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
+              <thead>
+                <tr>
+                  {['Position ID & QR Tag','Plant & Location','Equipment Specs','SOP Template','Status',''].map((h,i) => (
+                    <th key={i} style={{
+                      padding:'10px 14px', textAlign:i===5?'right':'left',
+                      fontSize:'10.5px', fontWeight:700, color:DS.textMuted,
+                      textTransform:'uppercase', letterSpacing:'0.06em',
+                      backgroundColor:'#F8FAFC',
+                      borderBottom:`2px solid ${DS.border}`,
+                      borderTop:`1px solid ${DS.border}`
+                    }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPositions.map((pos) => {
+                  const isOK  = pos.inspectionStatus === 'Inspected - OK';
+                  const isAtt = pos.inspectionStatus === 'Inspected - Attention';
+                  return (
+                    <tr key={pos.id} className="tbl-row" style={{ borderBottom:`1px solid ${DS.border}`, transition:'background 0.13s ease' }}>
+
+                      <td style={{ padding:'11px 14px', verticalAlign:'middle' }}>
+                        <div style={{ fontWeight:700, color:DS.textPrimary, fontSize:'12.5px' }}>{pos.id}</div>
+                        <span style={{ fontSize:'10.5px', color:'#4338CA', fontFamily:'monospace', backgroundColor:'#EEF2FF', padding:'1px 5px', borderRadius:'4px', display:'inline-block', marginTop:'2px' }}>
+                          {pos.qrCode}
+                        </span>
+                      </td>
+
+                      <td style={{ padding:'11px 14px', verticalAlign:'middle' }}>
+                        <div style={{ fontWeight:600, color:DS.textPrimary, fontSize:'12.5px' }}>{siteName(pos)}</div>
+                        <div style={{ fontSize:'11px', color:DS.textMuted }}>{pos.locationDescription}</div>
+                      </td>
+
+                      <td style={{ padding:'11px 14px', verticalAlign:'middle' }}>
+                        <div style={{ color:DS.textPrimary, fontWeight:500, fontSize:'12.5px' }}>{pos.currentEquipment?.type || pos.equipmentCategory}</div>
+                        <div style={{ fontSize:'11px', color:DS.textMuted }}>S/N: {pos.currentEquipment?.serialNumber||'N/A'} · {pos.currentEquipment?.capacity||'Standard'}</div>
+                      </td>
+
+                      <td style={{ padding:'11px 14px', verticalAlign:'middle' }}>
+                        <span style={{
+                          fontSize:'11px', fontWeight:700, padding:'3px 9px', borderRadius:'6px',
+                          backgroundColor:pos.templateId==='CL-11'?'#EFF6FF':'#FEF3C7',
+                          color:          pos.templateId==='CL-11'?'#1D4ED8':'#D97706',
+                          border:`1px solid ${pos.templateId==='CL-11'?'#BFDBFE':'#FDE68A'}`
+                        }}>
+                          {pos.templateId}
+                        </span>
+                      </td>
+
+                      <td style={{ padding:'11px 14px', verticalAlign:'middle' }}>
+                        <span style={{
+                          display:'inline-flex', alignItems:'center', gap:'5px',
+                          fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'100px',
+                          backgroundColor:isOK?'#ECFDF5':isAtt?'#FEF2F2':'#F1F5F9',
+                          color:          isOK?'#059669':isAtt?'#DC2626':'#64748B',
+                          border:`1px solid ${isOK?'#A7F3D0':isAtt?'#FECACA':'#E2E8F0'}`
+                        }}>
+                          <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:isOK?'#059669':isAtt?'#DC2626':'#94A3B8' }}/>
+                          {isOK?'Verified OK':isAtt?'Needs Attention':'Pending'}
+                        </span>
+                      </td>
+
+                      <td style={{ padding:'11px 14px', textAlign:'right', verticalAlign:'middle' }}>
+                        <button className="chip-btn"
+                          onClick={() => { if(onSelectPosition) onSelectPosition(pos); onNavigate('asset-details'); }}
+                          style={{
+                            height:'28px', padding:'0 11px', borderRadius:'6px',
+                            display:'inline-flex', alignItems:'center', gap:'4px',
+                            background:'linear-gradient(135deg,#1E3A8A,#2563EB)',
+                            color:'#FFF', fontSize:'11.5px', fontWeight:600,
+                            border:'none', cursor:'pointer',
+                            boxShadow:'0 2px 6px rgba(37,99,235,.28)',
+                            transition:'opacity 0.15s ease'
+                          }}>
+                          <Eye size={11}/> View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {filteredPositions.length === 0 && (
+              <div style={{ textAlign:'center', padding:'40px', color:DS.textMuted }}>
+                <Search size={26} style={{ opacity:.25, marginBottom:'8px' }}/>
+                <p style={{ fontSize:'13px' }}>No positions match your search or filter.</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* ═══ 7. PREMIUM FOOTER STATUS BAR ═══════════════════════════ */}
+      <div className="dash-row" style={{
+        padding:'13px 20px',
+        background:'linear-gradient(135deg,#0A0F1E 0%,#1E3A8A 100%)',
+        borderRadius:'14px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        flexWrap:'wrap', gap:'12px',
+        boxShadow:'0 4px 20px rgba(30,58,138,.3)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Sparkles size={16} color="#DC2626" />
-          <span style={{ fontSize: '0.78rem', color: '#4B5563' }}>
-            <strong>Phase 1 Validated Engine:</strong> Dynamic site coverage, permanent QR preservation (Req 9), mandatory defect photo validation, and offline cache.
+        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+          <div style={{
+            width:'28px', height:'28px', borderRadius:'8px',
+            backgroundColor:'rgba(255,255,255,0.10)',
+            display:'flex', alignItems:'center', justifyContent:'center'
+          }}>
+            <Sparkles size={13} color="#FCD34D"/>
+          </div>
+          <span style={{ fontSize:'12.5px', color:'rgba(255,255,255,0.85)', fontWeight:500 }}>
+            <strong style={{ color:'#FFF' }}>Phase 1 Validated Engine</strong> · Dynamic QR preservation · Mandatory defect photo validation · Permanent QR anchoring (Req 9) · Offline cache
           </span>
         </div>
-        <span style={{ fontSize: '0.74rem', color: '#6B7280' }}>
-          Indus Fire Safety Private Limited • Makoro UI Edition
-        </span>
+        <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', color:'rgba(255,255,255,0.65)' }}>
+            <LiveDot color="#34D399"/> System Online
+          </span>
+          <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.45)' }}>
+            Indus Fire Safety Pvt. Ltd. · Enterprise AMC Suite v1.0
+          </span>
+        </div>
       </div>
 
     </div>
