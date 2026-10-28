@@ -336,159 +336,162 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
       )}
 
-      {/* ═══ 2. PRIMARY KPI CARDS ════════════════════════════════════ */}
+      {/* ═══ 2. PRIMARY KPI CARDS (Ultra-Compact & Refined MNC Style) ═══ */}
       <div className="dash-row" style={{
-        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'13px'
+        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:'10px'
       }}>
 
         {/* KPI 1 – Coverage */}
-        <Card onClick={() => onNavigate('site-list')}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-            <div style={{ flex:1, minWidth:0 }}>
-              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
-                Inspection Coverage
-              </p>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
-                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
-                  {coveragePct}%
-                </span>
-                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
-                  {pendingPositions} pending
-                </span>
-              </div>
-              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>
-                {inspectedPositions} / {totalPositions} positions verified
-              </p>
-              <BarSegments segments={[
-                { label:'OK',        value:okPositions,              color:DS.emerald },
-                { label:'Attention', value:defectPositions.length,   color:DS.crimson },
-                { label:'Pending',   value:pendingPositions,         color:'#E2E8F0'  },
-              ]}/>
-            </div>
-            <div style={{ position:'relative', flexShrink:0, marginLeft:'12px' }}>
-              <DonutChart percent={coveragePct} color={coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson}/>
+        <Card onClick={() => onNavigate('site-list')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
+              Inspection Coverage
+            </span>
+            <div style={{ position:'relative', flexShrink:0 }}>
+              <DonutChart percent={coveragePct} color={coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson} size={34} strokeWidth={3.5}/>
               <div style={{
                 position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:'11px', fontWeight:800, color: coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson,
-                transform:'rotate(0deg)'
+                fontSize:'9px', fontWeight:600, color: coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson
               }}>{coveragePct}%</div>
             </div>
           </div>
+
+          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
+            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
+              {coveragePct}%
+            </span>
+            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
+              {pendingPositions} pending
+            </span>
+          </div>
+
+          <p style={{ fontSize:'11px', color:DS.textSec, margin:'0 0 6px 0' }}>
+            {inspectedPositions} / {totalPositions} positions verified
+          </p>
+
+          <BarSegments segments={[
+            { label:'OK',        value:okPositions,              color:DS.emerald },
+            { label:'Attention', value:defectPositions.length,   color:DS.crimson },
+            { label:'Pending',   value:pendingPositions,         color:'#E2E8F0'  },
+          ]}/>
         </Card>
 
         {/* KPI 2 – HPT Due */}
-        <Card onClick={() => onNavigate('digital-checklist')}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
-            <div style={{ flex:1 }}>
-              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
-                Cylinders Due – HPT (CL-11)
-              </p>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
-                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
-                  {hydroTests.length}
-                </span>
-                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
-                  1 overdue
-                </span>
-              </div>
-              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>IS 2190 hydrostatic 35 Bar proof test</p>
-              <Sparkline points={[3,5,4,7,6,9,hydroTests.length||9]} color={DS.crimson} width={100} height={26}/>
-            </div>
+        <Card onClick={() => onNavigate('digital-checklist')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
+              Cylinders Due (CL-11)
+            </span>
             <div style={{
-              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
-              background:'linear-gradient(135deg,#FEF2F2,#FEE2E2)',
-              border:'1px solid #FECACA',
+              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
+              background:'#FEF2F2', border:'1px solid #FECACA',
               display:'flex', alignItems:'center', justifyContent:'center'
             }}>
-              <Flame size={20} color="#DC2626"/>
+              <Flame size={13} color="#DC2626"/>
             </div>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
+            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
+              {hydroTests.length}
+            </span>
+            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
+              1 overdue
+            </span>
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>IS 2190 statutory 35 Bar proof</p>
+            <Sparkline points={[3,5,4,7,6,9,hydroTests.length||9]} color={DS.crimson} width={58} height={18}/>
           </div>
         </Card>
 
         {/* KPI 3 – Defect Alerts */}
-        <Card onClick={() => onNavigate('photo-remarks')}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
-            <div style={{ flex:1 }}>
-              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
-                Active Defect Alerts
-              </p>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
-                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
-                  {defectPositions.length}
-                </span>
-                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#FEF3C7', color:'#D97706' }}>
-                  2 low stock
-                </span>
-              </div>
-              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>Pressure gauges & hose washer dispatches</p>
-              <Sparkline points={[1,3,2,4,2,3,defectPositions.length||1]} color={DS.amber} width={100} height={26}/>
-            </div>
+        <Card onClick={() => onNavigate('photo-remarks')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
+              Defect / Spares Alerts
+            </span>
             <div style={{
-              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
-              background:'linear-gradient(135deg,#FFFBEB,#FEF3C7)',
-              border:'1px solid #FDE68A',
+              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
+              background:'#FFFBEB', border:'1px solid #FDE68A',
               display:'flex', alignItems:'center', justifyContent:'center'
             }}>
-              <AlertTriangle size={20} color="#D97706"/>
+              <AlertTriangle size={13} color="#D97706"/>
             </div>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
+            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
+              {defectPositions.length}
+            </span>
+            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEF3C7', color:'#D97706' }}>
+              2 low stock
+            </span>
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>Gauges & washer dispatches</p>
+            <Sparkline points={[1,3,2,4,2,3,defectPositions.length||1]} color={DS.amber} width={58} height={18}/>
           </div>
         </Card>
 
         {/* KPI 4 – Total Positions */}
-        <Card onClick={() => onNavigate('site-list')}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px' }}>
-            <div style={{ flex:1 }}>
-              <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 10px 0', textTransform:'uppercase', letterSpacing:'0.07em' }}>
-                Contracted AMC Positions
-              </p>
-              <div style={{ display:'flex', alignItems:'baseline', gap:'8px', marginBottom:'5px' }}>
-                <span style={{ fontSize:'40px', fontWeight:800, color:DS.textPrimary, lineHeight:1, letterSpacing:'-0.04em' }}>
-                  {totalPositions}
-                </span>
-                <span style={{ fontSize:'10.5px', fontWeight:700, padding:'2px 8px', borderRadius:'100px', backgroundColor:'#ECFDF5', color:'#059669' }}>
-                  {sites.length} plants
-                </span>
-              </div>
-              <p style={{ fontSize:'11.5px', color:DS.textSec, margin:'0 0 12px 0' }}>QR-tagged positions under active AMC</p>
-              <Sparkline points={[12,14,14,16,17,18,totalPositions||18]} color={DS.emerald} width={100} height={26}/>
-            </div>
+        <Card onClick={() => onNavigate('site-list')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
+            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
+              Contracted Positions
+            </span>
             <div style={{
-              width:'42px', height:'42px', borderRadius:'12px', flexShrink:0,
-              background:'linear-gradient(135deg,#ECFDF5,#D1FAE5)',
-              border:'1px solid #A7F3D0',
+              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
+              background:'#ECFDF5', border:'1px solid #A7F3D0',
               display:'flex', alignItems:'center', justifyContent:'center'
             }}>
-              <Building2 size={20} color="#059669"/>
+              <Building2 size={13} color="#059669"/>
             </div>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
+            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
+              {totalPositions}
+            </span>
+            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#ECFDF5', color:'#059669' }}>
+              {sites.length} plants
+            </span>
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>Permanent QR tagged assets</p>
+            <Sparkline points={[12,14,14,16,17,18,totalPositions||18]} color={DS.emerald} width={58} height={18}/>
           </div>
         </Card>
       </div>
 
-      {/* ═══ 3. SECONDARY METRIC STRIP ═══════════════════════════════ */}
+      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean) ═════════════ */}
       <div className="dash-row" style={{
-        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))', gap:'10px'
+        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:'8px'
       }}>
         {[
           { label:'Hydro Testing (CL-11)',  value:`${totalExtinguishers} units`, sub:'35 Bar certified',   color:DS.emerald, pts:[4,5,6,5,7,7,totalExtinguishers||6] },
           { label:'Hose Boxes (CL-03)',     value:`${totalHoseBoxes} units`,    sub:'Nozzles & lugs OK',  color:DS.sapphire,pts:[2,2,3,4,3,4,totalHoseBoxes||4]   },
-          { label:'QR Permanent Anchors',   value:'17 tagged',  sub:'Zero ID drift',     color:DS.violet,  pts:[10,12,13,14,15,16,17]                              },
+          { label:'QR Anchors',             value:'17 tagged',  sub:'Zero ID drift',     color:DS.violet,  pts:[10,12,13,14,15,16,17]                              },
           { label:'Defect Rectification',   value:'87.5%',      sub:'1 action pending',  color:DS.amber,   pts:[70,75,80,78,85,87,87.5]                            },
           { label:'Pressure Gauge Audits',  value:'94.2%',      sub:'Green zone calib.',  color:DS.emerald, pts:[88,90,92,91,93,94,94.2]                           },
           { label:'Field SLA Compliance',   value:'99.1%',      sub:'Zero safety breach', color:DS.sky,    pts:[97,98,98,99,99,99,99.1]                            },
         ].map((m,i) => (
           <div key={i} style={{
             backgroundColor:DS.cardBg, border:`1px solid ${DS.border}`,
-            borderRadius:DS.rMd, padding:'14px 16px', boxShadow:DS.shadowSm
+            borderRadius:'8px', padding:'9px 12px', boxShadow:DS.shadowSm
           }}>
-            <p style={{ fontSize:'10.5px', fontWeight:700, color:DS.textMuted, margin:'0 0 6px 0', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+            <p style={{ fontSize:'10px', fontWeight:500, color:DS.textMuted, margin:'0 0 3px 0' }}>
               {m.label}
             </p>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
               <div>
-                <div style={{ fontSize:'20px', fontWeight:800, color:DS.textPrimary, letterSpacing:'-0.025em' }}>{m.value}</div>
-                <div style={{ fontSize:'10.5px', color:m.color, fontWeight:600, marginTop:'2px' }}>{m.sub}</div>
+                <div style={{ fontSize:'15px', fontWeight:600, color:DS.textPrimary }}>{m.value}</div>
+                <div style={{ fontSize:'10px', color:m.color, fontWeight:500 }}>{m.sub}</div>
               </div>
-              <Sparkline points={m.pts} color={m.color} width={50} height={24}/>
+              <Sparkline points={m.pts} color={m.color} width={42} height={16}/>
             </div>
           </div>
         ))}
