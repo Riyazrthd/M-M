@@ -1174,7 +1174,70 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         />
       </div>
 
-      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean - 6 Balanced Columns) ═════ */}
+      {/* ═══ 3. MONTHLY AMC VISITS & PUNCH ANALYTICS (Requested MNC Dual-Axis Chart) ═══ */}
+      <div className="dash-row">
+        <MonthlyAmcVisitAnalyticsCard sites={sites} positions={positions} />
+      </div>
+
+      {/* ═══ 4. SITE COVERAGE ANALYTICS GRID ════════════════════════ */}
+      <div className="dash-row">
+        <Card>
+          <SectionHead
+            icon={Target}
+            iconBg="linear-gradient(135deg,#7C3AED,#A855F7)"
+            title="Site-by-Site Coverage Analytics"
+            sub="Inspection penetration across all contracted industrial plants"
+          />
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(195px,1fr))', gap:'11px' }}>
+            {sites.map(site => {
+              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
+              const col = pct===100 ? DS.emerald : pct>=50 ? DS.sapphire : DS.crimson;
+              return (
+                <div key={site.id} style={{
+                  padding:'15px', borderRadius:'12px',
+                  border:`1px solid ${DS.border}`, backgroundColor:'#FAFBFF',
+                  display:'flex', flexDirection:'column', gap:'10px'
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize:'13px', fontWeight:500, color:DS.textPrimary }}>{site.name}</div>
+                      <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
+                    </div>
+                    <span style={{ fontSize:'20px', fontWeight:500, color:col, letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                    <div style={{ position:'relative', flexShrink:0 }}>
+                      <DonutChart percent={pct} color={col} size={52} strokeWidth={6}/>
+                      <div style={{
+                        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:'9px', fontWeight:800, color:col
+                      }}>
+                        {site.inspectedPositions}/{site.totalPositions}
+                      </div>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      {[
+                        { label:'Inspected', val:site.inspectedPositions,                    color:col      },
+                        { label:'Pending',   val:site.totalPositions-site.inspectedPositions, color:'#E2E8F0' },
+                      ].map((it,j) => (
+                        <div key={j} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:DS.textSec, marginBottom:'3px' }}>
+                          <span style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                            <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:it.color, display:'inline-block' }}/>
+                            {it.label}
+                          </span>
+                          <strong style={{ color:DS.textPrimary }}>{it.val}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+
+      {/* ═══ 5. SECONDARY METRIC STRIP (Compact & Clean - 6 Balanced Columns) ═════ */}
       <div className="dash-row metric-strip-6">
         {[
           { 
@@ -1270,7 +1333,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         ))}
       </div>
 
-      {/* ═══ 4. TWO-COLUMN MIDDLE BLOCK (Requested MNC Card Style) ══════ */}
+      {/* ═══ 6. TWO-COLUMN MIDDLE BLOCK (Requested MNC Card Style) ══════ */}
       <div className="dash-row" style={{
         display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:'14px'
       }}>
@@ -1621,69 +1684,6 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             ))}
           </ul>
         </section>
-      </div>
-
-      {/* ═══ 5. MONTHLY AMC VISITS & PUNCH ANALYTICS (Requested MNC Dual-Axis Chart) ═══ */}
-      <div className="dash-row">
-        <MonthlyAmcVisitAnalyticsCard sites={sites} positions={positions} />
-      </div>
-
-      {/* ═══ 6. SITE COVERAGE ANALYTICS GRID ════════════════════════ */}
-      <div className="dash-row">
-        <Card>
-          <SectionHead
-            icon={Target}
-            iconBg="linear-gradient(135deg,#7C3AED,#A855F7)"
-            title="Site-by-Site Coverage Analytics"
-            sub="Inspection penetration across all contracted industrial plants"
-          />
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(195px,1fr))', gap:'11px' }}>
-            {sites.map(site => {
-              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
-              const col = pct===100 ? DS.emerald : pct>=50 ? DS.sapphire : DS.crimson;
-              return (
-                <div key={site.id} style={{
-                  padding:'15px', borderRadius:'12px',
-                  border:`1px solid ${DS.border}`, backgroundColor:'#FAFBFF',
-                  display:'flex', flexDirection:'column', gap:'10px'
-                }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize:'13px', fontWeight:500, color:DS.textPrimary }}>{site.name}</div>
-                      <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
-                    </div>
-                    <span style={{ fontSize:'20px', fontWeight:500, color:col, letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-                    <div style={{ position:'relative', flexShrink:0 }}>
-                      <DonutChart percent={pct} color={col} size={52} strokeWidth={6}/>
-                      <div style={{
-                        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:'9px', fontWeight:800, color:col
-                      }}>
-                        {site.inspectedPositions}/{site.totalPositions}
-                      </div>
-                    </div>
-                    <div style={{ flex:1 }}>
-                      {[
-                        { label:'Inspected', val:site.inspectedPositions,                    color:col      },
-                        { label:'Pending',   val:site.totalPositions-site.inspectedPositions, color:'#E2E8F0' },
-                      ].map((it,j) => (
-                        <div key={j} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:DS.textSec, marginBottom:'3px' }}>
-                          <span style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-                            <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:it.color, display:'inline-block' }}/>
-                            {it.label}
-                          </span>
-                          <strong style={{ color:DS.textPrimary }}>{it.val}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
       </div>
 
       {/* ═══ 7. FULL-WIDTH EQUIPMENT TABLE ═══════════════════════════ */}
