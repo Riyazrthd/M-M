@@ -129,6 +129,111 @@ function Card({ children, style={}, onClick }) {
   );
 }
 
+/* ── MNC Enterprise KPI Card (Exact Requested Style) ────────── */
+function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHoverColor = '#0B6B63' }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        height: '116px',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        borderRadius: '12px',
+        backgroundColor: hovered ? '#EDEDED' : '#F4F5F5',
+        padding: '16px 18px',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+        boxSizing: 'border-box',
+        justifyContent: 'space-between'
+      }}
+    >
+      {/* Top row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{
+          fontSize: '12px',
+          fontWeight: 500,
+          color: hovered ? accentHoverColor : '#6B7280',
+          transition: 'color 0.15s ease'
+        }}>
+          {title}
+        </span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            color: hovered ? accentHoverColor : '#D1D5DB',
+            transition: 'color 0.15s ease',
+            flexShrink: 0
+          }}
+          aria-hidden="true"
+        >
+          <path d="M7 7h10v10"></path>
+          <path d="M7 17 17 7"></path>
+        </svg>
+      </div>
+
+      {/* Middle value row */}
+      <p style={{
+        marginTop: '8px',
+        marginBottom: 0,
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: '6px',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis'
+      }}>
+        <span style={{
+          fontSize: '28px',
+          fontWeight: 500,
+          letterSpacing: '-0.025em',
+          lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums',
+          color: '#363D42'
+        }}>
+          {value}
+        </span>
+        {inlineStatus && (
+          <span style={{
+            fontSize: '12px',
+            fontWeight: 500,
+            color: '#6B7280',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {inlineStatus}
+          </span>
+        )}
+      </p>
+
+      {/* Bottom row */}
+      <p style={{
+        marginTop: '8px',
+        marginBottom: 0,
+        fontSize: '12px',
+        color: '#9CA3AF',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {bottomText}
+      </p>
+    </div>
+  );
+}
+
 /* ── Section Icon Header ─────────────────────────────────────── */
 function SectionHead({ icon: Icon, iconBg='linear-gradient(135deg,#1E3A8A,#2563EB)', title, sub, right }) {
   return (
@@ -336,135 +441,47 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
       )}
 
-      {/* ═══ 2. PRIMARY KPI CARDS (Ultra-Compact & Refined MNC Style) ═══ */}
+      {/* ═══ 2. PRIMARY KPI CARDS (Exact Requested MNC Style) ════════ */}
       <div className="dash-row" style={{
-        display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))', gap:'10px'
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))',
+        gap:'14px'
       }}>
-
         {/* KPI 1 – Coverage */}
-        <Card onClick={() => onNavigate('site-list')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
-              Inspection Coverage
-            </span>
-            <div style={{ position:'relative', flexShrink:0 }}>
-              <DonutChart percent={coveragePct} color={coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson} size={34} strokeWidth={3.5}/>
-              <div style={{
-                position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:'9px', fontWeight:600, color: coveragePct >= 80 ? DS.emerald : coveragePct >= 40 ? DS.amber : DS.crimson
-              }}>{coveragePct}%</div>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
-              {coveragePct}%
-            </span>
-            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
-              {pendingPositions} pending
-            </span>
-          </div>
-
-          <p style={{ fontSize:'11px', color:DS.textSec, margin:'0 0 6px 0' }}>
-            {inspectedPositions} / {totalPositions} positions verified
-          </p>
-
-          <BarSegments segments={[
-            { label:'OK',        value:okPositions,              color:DS.emerald },
-            { label:'Attention', value:defectPositions.length,   color:DS.crimson },
-            { label:'Pending',   value:pendingPositions,         color:'#E2E8F0'  },
-          ]}/>
-        </Card>
+        <MncKpiCard
+          title="Inspection coverage"
+          value={`${coveragePct}%`}
+          inlineStatus={`${pendingPositions} pending`}
+          bottomText={`${inspectedPositions} of ${totalPositions} permanent positions verified`}
+          onClick={() => onNavigate('site-list')}
+        />
 
         {/* KPI 2 – HPT Due */}
-        <Card onClick={() => onNavigate('digital-checklist')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
-              Cylinders Due (CL-11)
-            </span>
-            <div style={{
-              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
-              background:'#FEF2F2', border:'1px solid #FECACA',
-              display:'flex', alignItems:'center', justifyContent:'center'
-            }}>
-              <Flame size={13} color="#DC2626"/>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
-              {hydroTests.length}
-            </span>
-            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEE2E2', color:'#DC2626' }}>
-              1 overdue
-            </span>
-          </div>
-
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>IS 2190 statutory 35 Bar proof</p>
-            <Sparkline points={[3,5,4,7,6,9,hydroTests.length||9]} color={DS.crimson} width={58} height={18}/>
-          </div>
-        </Card>
+        <MncKpiCard
+          title="Cylinders due for HPT (CL-11)"
+          value={hydroTests.length}
+          inlineStatus="1 late"
+          bottomText="Statutory IS 2190 hydrostatic 35 Bar proof test"
+          onClick={() => onNavigate('digital-checklist')}
+        />
 
         {/* KPI 3 – Defect Alerts */}
-        <Card onClick={() => onNavigate('photo-remarks')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
-              Defect / Spares Alerts
-            </span>
-            <div style={{
-              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
-              background:'#FFFBEB', border:'1px solid #FDE68A',
-              display:'flex', alignItems:'center', justifyContent:'center'
-            }}>
-              <AlertTriangle size={13} color="#D97706"/>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
-              {defectPositions.length}
-            </span>
-            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#FEF3C7', color:'#D97706' }}>
-              2 low stock
-            </span>
-          </div>
-
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>Gauges & washer dispatches</p>
-            <Sparkline points={[1,3,2,4,2,3,defectPositions.length||1]} color={DS.amber} width={58} height={18}/>
-          </div>
-        </Card>
+        <MncKpiCard
+          title="Stock / Spares alerts"
+          value={defectPositions.length}
+          inlineStatus="2 low stock"
+          bottomText="Pressure gauges & delivery hose washer dispatches"
+          onClick={() => onNavigate('photo-remarks')}
+        />
 
         {/* KPI 4 – Total Positions */}
-        <Card onClick={() => onNavigate('site-list')} style={{ padding:'12px 14px', borderRadius:'10px' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' }}>
-            <span style={{ fontSize:'11px', fontWeight:500, color:DS.textMuted, textTransform:'uppercase', letterSpacing:'0.04em' }}>
-              Contracted Positions
-            </span>
-            <div style={{
-              width:'26px', height:'26px', borderRadius:'6px', flexShrink:0,
-              background:'#ECFDF5', border:'1px solid #A7F3D0',
-              display:'flex', alignItems:'center', justifyContent:'center'
-            }}>
-              <Building2 size={13} color="#059669"/>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'baseline', gap:'6px', marginBottom:'4px' }}>
-            <span style={{ fontSize:'22px', fontWeight:600, color:DS.textPrimary, lineHeight:1.1 }}>
-              {totalPositions}
-            </span>
-            <span style={{ fontSize:'10px', fontWeight:500, padding:'1px 6px', borderRadius:'4px', backgroundColor:'#ECFDF5', color:'#059669' }}>
-              {sites.length} plants
-            </span>
-          </div>
-
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-            <p style={{ fontSize:'11px', color:DS.textSec, margin:0 }}>Permanent QR tagged assets</p>
-            <Sparkline points={[12,14,14,16,17,18,totalPositions||18]} color={DS.emerald} width={58} height={18}/>
-          </div>
-        </Card>
+        <MncKpiCard
+          title="Contracted AMC positions"
+          value={totalPositions}
+          inlineStatus={`${sites.length} client plants`}
+          bottomText="Total permanent equipment positions under active AMC inspection"
+          onClick={() => onNavigate('site-list')}
+        />
       </div>
 
       {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean) ═════════════ */}
