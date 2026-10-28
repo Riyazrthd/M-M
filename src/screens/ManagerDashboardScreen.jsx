@@ -521,7 +521,8 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         .dash-row:nth-child(6){animation-delay:.30s}
         .dash-row:nth-child(7){animation-delay:.35s}
         .tbl-row:hover > td { background:#F5F8FF !important; }
-        .hdr-btn:hover { opacity:.82; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.14) !important; }
+        .hdr-btn { font-family: inherit; }
+        .hdr-btn:active { transform: scale(0.98); }
         .chip-btn:hover { opacity:.80; }
         .kpi-row-4 {
           display: grid;
@@ -562,71 +563,100 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
       {/* ═══ 1. DATE & ACTION BAR ════════════════════════════════════ */}
       <div className="dash-row" style={{
         display:'flex', justifyContent:'space-between', alignItems:'center',
-        flexWrap:'wrap', gap:'12px', paddingBottom:'2px'
+        flexWrap:'wrap', gap:'10px', paddingBottom:'2px'
       }}>
         {/* Date Display */}
         <div style={{
           display:'inline-flex',
           alignItems:'center',
           gap:'6px',
-          fontSize:'13px',
+          fontSize:'12px',
           fontWeight:500,
           color:'#6B7280'
         }}>
-          <Calendar size={15} color="#9CA3AF" />
+          <Calendar size={13} color="#9CA3AF" />
           <span>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
 
-        <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
-          {[
-            {
-              label:'Supabase Backup', icon:<Database size={13}/>,
-              color:'#0369A1', border:'#BAE6FD', bg:'#F0F9FF',
-              action: () => { downloadSQLBackupFile(); setDownloadNotice('Supabase SQL Backup downloaded!'); setTimeout(()=>setDownloadNotice(''),5000); }
-            },
-            {
-              label: isDownloadingMaster ? 'Preparing…' : 'Master Excel (26 CLs)',
-              icon:<FileSpreadsheet size={13}/>,
-              color:'#1E3A8A', border:'#C7D2FE', bg:'#EEF2FF',
-              action: handleDownloadMasterExcel, disabled: isDownloadingMaster
-            }
-          ].map((b,i) => (
-            <button key={i} className="hdr-btn" onClick={b.action} disabled={b.disabled}
-              style={{
-                height:'36px', padding:'0 14px', borderRadius:'9px',
-                display:'flex', alignItems:'center', gap:'6px',
-                backgroundColor:b.bg, border:`1px solid ${b.border}`,
-                color:b.color, fontSize:'12.5px', fontWeight:600,
-                cursor:'pointer', opacity:b.disabled?.5:1,
-                boxShadow:DS.shadowSm, transition:'all 0.18s ease'
-              }}>
-              {b.icon} {b.label}
-            </button>
-          ))}
-
-          <button className="hdr-btn" onClick={() => onNavigate('asset-register')}
+        <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
+          {/* Supabase Backup */}
+          <button
+            className="hdr-btn"
+            onClick={() => { downloadSQLBackupFile(); setDownloadNotice('Supabase SQL Backup downloaded!'); setTimeout(()=>setDownloadNotice(''),5000); }}
             style={{
-              height:'36px', padding:'0 16px', borderRadius:'9px',
-              display:'flex', alignItems:'center', gap:'6px',
-              background:'linear-gradient(135deg,#111827,#374151)',
-              color:'#FFF', fontSize:'12.5px', fontWeight:700,
-              cursor:'pointer', border:'none',
-              boxShadow:'0 3px 10px rgba(17,24,39,.35)',
-              transition:'all 0.18s ease'
-            }}>
-            <PlusCircle size={13}/> Register Asset
+              height:'30px', padding:'0 11px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'6px',
+              backgroundColor:'#FFFFFF', border:'1px solid #E5E7EB',
+              color:'#374151', fontSize:'12px', fontWeight:500,
+              cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.03)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#D1D5DB'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+          >
+            <Database size={12} color="#0284C7" />
+            <span>Supabase Backup</span>
           </button>
 
-          <button className="hdr-btn" onClick={() => onNavigate('site-list')}
+          {/* Master Excel */}
+          <button
+            className="hdr-btn"
+            onClick={handleDownloadMasterExcel}
+            disabled={isDownloadingMaster}
             style={{
-              height:'36px', padding:'0 14px', borderRadius:'9px',
-              display:'flex', alignItems:'center', gap:'5px',
-              backgroundColor:'#FFF', border:`1px solid ${DS.border}`,
-              color:DS.textSec, fontSize:'12.5px', fontWeight:500,
-              cursor:'pointer', boxShadow:DS.shadowSm,
-              transition:'all 0.18s ease'
-            }}>
-            View All Plants <ArrowRight size={12}/>
+              height:'30px', padding:'0 11px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'6px',
+              backgroundColor:'#FFFFFF', border:'1px solid #E5E7EB',
+              color:'#374151', fontSize:'12px', fontWeight:500,
+              cursor: isDownloadingMaster ? 'not-allowed' : 'pointer',
+              opacity: isDownloadingMaster ? 0.6 : 1,
+              boxShadow:'0 1px 2px rgba(0,0,0,0.03)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { if (!isDownloadingMaster) { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#D1D5DB'; } }}
+            onMouseLeave={(e) => { if (!isDownloadingMaster) { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E5E7EB'; } }}
+          >
+            <FileSpreadsheet size={12} color="#2563EB" />
+            <span>{isDownloadingMaster ? 'Preparing…' : 'Master Excel (26 CLs)'}</span>
+          </button>
+
+          {/* Register Asset */}
+          <button
+            className="hdr-btn"
+            onClick={() => onNavigate('asset-register')}
+            style={{
+              height:'30px', padding:'0 12px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'5px',
+              backgroundColor:'#111827', border:'1px solid #111827',
+              color:'#FFFFFF', fontSize:'12px', fontWeight:500,
+              cursor:'pointer',
+              boxShadow:'0 1px 2px rgba(17,24,39,0.12)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1F2937'; e.currentTarget.style.borderColor = '#1F2937'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#111827'; e.currentTarget.style.borderColor = '#111827'; }}
+          >
+            <PlusCircle size={12} strokeWidth={2} />
+            <span>Register Asset</span>
+          </button>
+
+          {/* View All Plants */}
+          <button
+            className="hdr-btn"
+            onClick={() => onNavigate('site-list')}
+            style={{
+              height:'30px', padding:'0 11px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'5px',
+              backgroundColor:'#FFFFFF', border:'1px solid #E5E7EB',
+              color:'#374151', fontSize:'12px', fontWeight:500,
+              cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.03)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F9FAFB'; e.currentTarget.style.borderColor = '#D1D5DB'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+          >
+            <span>View All Plants</span>
+            <ArrowRight size={12} color="#6B7280" />
           </button>
         </div>
       </div>
