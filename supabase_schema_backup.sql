@@ -169,6 +169,30 @@ CREATE TABLE IF NOT EXISTS public.audit_sync_queue (
 );
 
 -- ============================================================================
+-- 8. TABLE: qr_registry (Permanent Bulk QR Codes & Asset Bindings)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.qr_registry (
+    id VARCHAR(64) PRIMARY KEY,
+    token VARCHAR(128) NOT NULL UNIQUE,
+    display_no VARCHAR(64) NOT NULL UNIQUE,
+    seq_number INTEGER NOT NULL UNIQUE,
+    batch_id VARCHAR(64) NOT NULL,
+    batch_label VARCHAR(128),
+    generated_date VARCHAR(64),
+    generated_time VARCHAR(64),
+    generated_at TIMESTAMPTZ DEFAULT NOW(),
+    generated_by VARCHAR(128) DEFAULT 'Admin',
+    assignment_status VARCHAR(64) DEFAULT 'Available',
+    linked_asset_id VARCHAR(64),
+    linked_position_id VARCHAR(64),
+    linked_asset_name VARCHAR(255),
+    assigned_date VARCHAR(64),
+    assigned_by VARCHAR(128),
+    lifecycle_status VARCHAR(64) DEFAULT 'Active',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_sites_code ON public.sites(code);
@@ -177,6 +201,10 @@ CREATE INDEX IF NOT EXISTS idx_positions_site_id ON public.positions(site_id);
 CREATE INDEX IF NOT EXISTS idx_positions_equipment_type ON public.positions(equipment_type);
 CREATE INDEX IF NOT EXISTS idx_visits_site_id ON public.visits(site_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_master_cat ON public.equipment_master(category);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_token ON public.qr_registry(token);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_batch ON public.qr_registry(batch_id);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_status ON public.qr_registry(assignment_status);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_seq ON public.qr_registry(seq_number);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -189,6 +217,7 @@ ALTER TABLE public.plant_technicians ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.positions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_sync_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.qr_registry ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
@@ -212,6 +241,9 @@ BEGIN
 
     DROP POLICY IF EXISTS "Public access to audit_sync_queue" ON public.audit_sync_queue;
     CREATE POLICY "Public access to audit_sync_queue" ON public.audit_sync_queue FOR ALL USING (true) WITH CHECK (true);
+
+    DROP POLICY IF EXISTS "Public access to qr_registry" ON public.qr_registry;
+    CREATE POLICY "Public access to qr_registry" ON public.qr_registry FOR ALL USING (true) WITH CHECK (true);
 END $$;
 
 -- ============================================================================

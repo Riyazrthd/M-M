@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getPositions, getPositionByQR } from '../data/storage';
+import { getPositions, getPositionByQR, getQRRecordByToken } from '../data/storage';
 import { 
   QrCode, 
   Search, 
@@ -114,11 +114,21 @@ export default function QRScannerScreen({ onNavigate, onSelectPosition, activeSi
       }
       // Direct opening of the mapped digital checklist
       onNavigate('digital-checklist');
-    } else {
-      setScanError(`Asset not found: No equipment position registered for code "${code}".`);
-      setUnknownCode(code);
-      setScannedResult(null);
+      return;
     }
+
+    // Check if this is an unassigned QR code from the permanent registry (Module 3)
+    const qrRec = getQRRecordByToken(code);
+    if (qrRec && qrRec.assignmentStatus === 'Available') {
+      setScanError('');
+      setUnknownCode('');
+      onNavigate('asset-register', { prefilledQR: qrRec });
+      return;
+    }
+
+    setScanError(`Asset not found: No equipment position registered for code "${code}".`);
+    setUnknownCode(code);
+    setScannedResult(null);
   };
 
   const handleStartInspection = () => {

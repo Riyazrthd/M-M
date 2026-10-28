@@ -20,6 +20,7 @@ import VisitSummaryScreen from './screens/VisitSummaryScreen';
 import ManagerDashboardScreen from './screens/ManagerDashboardScreen';
 import ClientPortalScreen from './screens/ClientPortalScreen';
 import AssetRegisterScreen from './screens/AssetRegisterScreen';
+import QRManagementScreen from './screens/QRManagementScreen';
 
 import { 
   initStorage, 
@@ -27,31 +28,47 @@ import {
   getSites, 
   getPositions, 
   getPositionByQR, 
-  resolveScannedAssetPosition 
+  resolveScannedAssetPosition,
+  getQRRecordByToken
 } from './data/storage';
 
 // Synchronously detect if launched directly via scanned QR code URL
 const detectInitialScanState = () => {
-  if (typeof window === 'undefined') return { isDirectScan: false, scanCode: null, position: null, site: null };
+  if (typeof window === 'undefined') return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null };
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const scanCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id');
     if (scanCode) {
       initStorage();
-      const pos = resolveScannedAssetPosition(scanCode, urlParams);
+      const resolved = resolveScannedAssetPosition(scanCode, urlParams);
+      if (resolved && resolved.isUnassignedQR) {
+        // Scanned an unassigned pre-printed QR code: open asset registration directly
+        return {
+          isDirectScan: false,
+          scanCode,
+          position: null,
+          site: getSites()[0] || null,
+          prefilledQR: resolved.qrRecord,
+          initialScreen: 'asset-register'
+        };
+      }
+
+      const pos = resolved;
       const sites = getSites();
       const site = pos ? (sites.find(s => s.id === pos.siteId) || sites[0]) : (sites[0] || null);
       return {
         isDirectScan: true,
         scanCode,
         position: pos,
-        site: site
+        site: site,
+        prefilledQR: null,
+        initialScreen: 'digital-checklist'
       };
     }
   } catch (e) {
     console.warn('Initial scan detection error:', e);
   }
-  return { isDirectScan: false, scanCode: null, position: null, site: null };
+  return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null };
 };
 
 export default function App() {
@@ -59,9 +76,10 @@ export default function App() {
 
   // Direct scan mode flag: when true, hides sidebar, topbar, demo banners, and bottom navigation
   const [isDirectScanMode, setIsDirectScanMode] = useState(initialScan.isDirectScan);
-  const [currentScreen, setCurrentScreen] = useState(initialScan.isDirectScan ? 'digital-checklist' : 'manager-dashboard');
+  const [currentScreen, setCurrentScreen] = useState(initialScan.initialScreen || (initialScan.isDirectScan ? 'digital-checklist' : 'manager-dashboard'));
   const [activeSite, setActiveSite] = useState(initialScan.site || null);
   const [activePosition, setActivePosition] = useState(initialScan.position || null);
+  const [prefilledQR, setPrefilledQR] = useState(initialScan.prefilledQR || null);
   const [currentUser, setCurrentUserState] = useState(getCurrentUser());
 
   // Layout UI state
@@ -298,11 +316,24 @@ export default function App() {
             />
           )}
 
+          {currentScreen === 'qr-management' && (
+            <QRManagementScreen
+              onNavigate={navigateTo}
+              onRegisterWithQR={(qrRec) => {
+                setPrefilledQR(qrRec);
+                navigateTo('asset-register');
+              }}
+              onSelectPosition={handleSelectPosition}
+            />
+          )}
+
           {currentScreen === 'asset-register' && (
             <AssetRegisterScreen
               onNavigate={navigateTo}
+              prefilledQR={prefilledQR}
               onAssetRegistered={(newPos) => {
                 setActivePosition(newPos);
+                setPrefilledQR(null);
               }}
             />
           )}
@@ -310,7 +341,12 @@ export default function App() {
           {currentScreen === 'qr-scanner' && (
             <QRScannerScreen
               activeSite={activeSite}
-              onNavigate={navigateTo}
+              onNavigate={(target, data) => {
+                if (data?.prefilledQR) {
+                  setPrefilledQR(data.prefilledQR);
+                }
+                navigateTo(target);
+              }}
               onSelectPosition={handleSelectPosition}
             />
           )}

@@ -9,6 +9,7 @@ import {
   getPositions,
   getPositionByQR,
   resolveScannedAssetPosition,
+  getQRRecordByToken,
   getChecklistSession,
   submitAssetObservation,
   completeChecklistSession
@@ -285,12 +286,26 @@ export default function DigitalChecklistScreen({
     const clean = (code || '').trim();
     if (!clean) return;
 
+    // Check if this is an unassigned QR code from advance bulk generation (Module 3)
+    const qrRec = getQRRecordByToken(clean);
+    if (qrRec && qrRec.assignmentStatus === 'Available') {
+      setValidationError(`QR Code "${qrRec.displayNo}" (${qrRec.token}) is available but NOT yet registered to an asset. Please stick this label onto the physical equipment and register it first under QR Code Management.`);
+      handleCloseScanner();
+      return;
+    }
+
     const matched = resolveScannedAssetPosition(clean) || getPositionByQR(clean) || getPositions().find(p => 
       p.positionId.toLowerCase() === clean.toLowerCase() ||
       (p.currentEquipment?.serialNo && p.currentEquipment.serialNo.toLowerCase() === clean.toLowerCase())
     );
 
-    if (matched) {
+    if (matched && matched.isUnassignedQR) {
+      setValidationError(`QR Code "${matched.qrRecord?.displayNo || clean}" is not yet registered to an asset. Please register this physical equipment first.`);
+      handleCloseScanner();
+      return;
+    }
+
+    if (matched && matched.positionId) {
       // Check if this asset has already been inspected in this parent checklist session
       const alreadyDone = submittedRecords.some(r => r.positionId === matched.positionId);
       if (alreadyDone) {

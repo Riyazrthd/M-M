@@ -5,7 +5,8 @@ import {
   getSites, 
   getPositions, 
   getVisits, 
-  getPlantTechnicians 
+  getPlantTechnicians,
+  getQRRegistry
 } from '../data/storage.js';
 import { 
   INITIAL_TEMPLATE_MAPPINGS, 
@@ -286,6 +287,30 @@ CREATE TABLE IF NOT EXISTS public.audit_sync_queue (
 );
 
 -- ============================================================================
+-- 8. TABLE: qr_registry (Permanent Bulk QR Codes & Asset Bindings)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.qr_registry (
+    id VARCHAR(64) PRIMARY KEY,
+    token VARCHAR(128) NOT NULL UNIQUE,
+    display_no VARCHAR(64) NOT NULL UNIQUE,
+    seq_number INTEGER NOT NULL UNIQUE,
+    batch_id VARCHAR(64) NOT NULL,
+    batch_label VARCHAR(128),
+    generated_date VARCHAR(64),
+    generated_time VARCHAR(64),
+    generated_at TIMESTAMPTZ DEFAULT NOW(),
+    generated_by VARCHAR(128) DEFAULT 'Admin',
+    assignment_status VARCHAR(64) DEFAULT 'Available',
+    linked_asset_id VARCHAR(64),
+    linked_position_id VARCHAR(64),
+    linked_asset_name VARCHAR(255),
+    assigned_date VARCHAR(64),
+    assigned_by VARCHAR(128),
+    lifecycle_status VARCHAR(64) DEFAULT 'Active',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_sites_code ON public.sites(code);
@@ -294,6 +319,10 @@ CREATE INDEX IF NOT EXISTS idx_positions_site_id ON public.positions(site_id);
 CREATE INDEX IF NOT EXISTS idx_positions_equipment_type ON public.positions(equipment_type);
 CREATE INDEX IF NOT EXISTS idx_visits_site_id ON public.visits(site_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_master_cat ON public.equipment_master(category);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_token ON public.qr_registry(token);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_batch ON public.qr_registry(batch_id);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_status ON public.qr_registry(assignment_status);
+CREATE INDEX IF NOT EXISTS idx_qr_registry_seq ON public.qr_registry(seq_number);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -306,6 +335,7 @@ ALTER TABLE public.plant_technicians ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.positions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_sync_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.qr_registry ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
@@ -329,6 +359,9 @@ BEGIN
 
     DROP POLICY IF EXISTS "Public access to audit_sync_queue" ON public.audit_sync_queue;
     CREATE POLICY "Public access to audit_sync_queue" ON public.audit_sync_queue FOR ALL USING (true) WITH CHECK (true);
+
+    DROP POLICY IF EXISTS "Public access to qr_registry" ON public.qr_registry;
+    CREATE POLICY "Public access to qr_registry" ON public.qr_registry FOR ALL USING (true) WITH CHECK (true);
 END $$;
 
 -- ============================================================================
@@ -464,12 +497,45 @@ END $$;
   updated_at = NOW();\n\n`;
   }
 
+  // 7. QR Registry Inserts (Module 1 & 10)
+  const qrRegistry = getQRRegistry();
+  sql += `-- Backing up ${qrRegistry.length} Permanent QR Code Records\n`;
+  for (const qr of qrRegistry) {
+    sql += `INSERT INTO public.qr_registry (
+  id, token, display_no, seq_number, batch_id, batch_label, 
+  generated_date, generated_time, generated_at, generated_by, 
+  assignment_status, linked_asset_id, linked_position_id, 
+  linked_asset_name, assigned_date, assigned_by, lifecycle_status
+) VALUES (
+  ${sqlEscape(qr.id)}, ${sqlEscape(qr.token)}, ${sqlEscape(qr.displayNo)}, 
+  ${qr.seqNumber || 0}, ${sqlEscape(qr.batchId)}, ${sqlEscape(qr.batchLabel)}, 
+  ${sqlEscape(qr.generatedDate)}, ${sqlEscape(qr.generatedTime)}, 
+  ${sqlEscape(qr.generatedAt || new Date().toISOString())}, 
+  ${sqlEscape(qr.generatedBy || 'Admin')}, 
+  ${sqlEscape(qr.assignmentStatus || 'Available')}, 
+  ${sqlEscape(qr.linkedAssetId || null)}, 
+  ${sqlEscape(qr.linkedPositionId || null)}, 
+  ${sqlEscape(qr.linkedAssetName || null)}, 
+  ${sqlEscape(qr.assignedDate || null)}, 
+  ${sqlEscape(qr.assignedBy || null)}, 
+  ${sqlEscape(qr.lifecycleStatus || 'Active')}
+) ON CONFLICT (token) DO UPDATE SET 
+  assignment_status = EXCLUDED.assignment_status,
+  linked_asset_id = EXCLUDED.linked_asset_id,
+  linked_position_id = EXCLUDED.linked_position_id,
+  linked_asset_name = EXCLUDED.linked_asset_name,
+  assigned_date = EXCLUDED.assigned_date,
+  assigned_by = EXCLUDED.assigned_by,
+  lifecycle_status = EXCLUDED.lifecycle_status;\n\n`;
+  }
+
   sql += `-- ============================================================================
 -- BACKUP COMPLETE
 -- Total Sites: ${sites.length}
 -- Total Equipment Master Types: ${equipmentMaster.length}
 -- Total Positions (QR tags): ${positions.length}
 -- Total Visits: ${visits.length}
+-- Total Permanent QR Codes: ${qrRegistry.length}
 -- ============================================================================
 `;
 
@@ -500,6 +566,7 @@ export function generateJSONBackup() {
   const positions = getPositions();
   const visits = getVisits();
   const technicians = getPlantTechnicians();
+  const qrRegistry = getQRRegistry();
   const equipmentMaster = (() => {
     try {
       const raw = localStorage.getItem('ifspl_amc_equipment_master');
@@ -528,7 +595,8 @@ export function generateJSONBackup() {
       visits,
       plant_technicians: technicians,
       equipment_master: equipmentMaster,
-      template_mappings: templateMappings
+      template_mappings: templateMappings,
+      qr_registry: qrRegistry
     }
   };
 }
@@ -773,6 +841,38 @@ export async function pushDataToSupabase(url, anonKey) {
       body: JSON.stringify(visits)
     });
     if (resVisits.ok) results.visits = visits.length;
+
+    // 6. Sync QR Registry
+    const qrList = getQRRegistry().map(qr => ({
+      id: qr.id,
+      token: qr.token,
+      display_no: qr.displayNo,
+      seq_number: qr.seqNumber || 0,
+      batch_id: qr.batchId,
+      batch_label: qr.batchLabel,
+      generated_date: qr.generatedDate,
+      generated_time: qr.generatedTime,
+      generated_at: qr.generatedAt || new Date().toISOString(),
+      generated_by: qr.generatedBy || 'Admin',
+      assignment_status: qr.assignmentStatus || 'Available',
+      linked_asset_id: qr.linkedAssetId || null,
+      linked_position_id: qr.linkedPositionId || null,
+      linked_asset_name: qr.linkedAssetName || null,
+      assigned_date: qr.assignedDate || null,
+      assigned_by: qr.assignedBy || null,
+      lifecycle_status: qr.lifecycleStatus || 'Active'
+    }));
+
+    try {
+      const resQr = await fetch(`${cleanUrl}/rest/v1/qr_registry`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(qrList)
+      });
+      if (resQr.ok) results.qrRegistry = qrList.length;
+    } catch (e) {
+      console.warn('QR registry sync notice:', e);
+    }
 
     // Record last sync timestamp
     saveSupabaseConfig({ lastSyncedAt: new Date().toISOString() });

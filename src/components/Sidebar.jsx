@@ -58,6 +58,7 @@ export default function Sidebar({
       items: [
         { id: 'manager-dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'site-list', label: 'Client List', icon: Building2 },
+        { id: 'qr-management', label: 'QR Code Management', icon: QrCode, badge: 'Bulk' },
         { id: 'asset-register', label: 'Register Asset & QR', icon: PlusCircle, badge: 'New' },
         { id: 'qr-scanner', label: 'QR Tag Scanner', icon: QrCode }
       ]

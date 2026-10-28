@@ -4,7 +4,7 @@
 import { DEMO_USERS, DEMO_SITES, DEMO_POSITIONS, DEMO_ACTIVE_VISIT } from './sampleData.js';
 import { INITIAL_TEMPLATE_MAPPINGS, INITIAL_EQUIPMENT_MASTER, resolveChecklistMapping } from './templateMappings.js';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   CURRENT_USER: 'ifspl_amc_user',
   SITES: 'ifspl_amc_sites',
   POSITIONS: 'ifspl_amc_positions',
@@ -13,7 +13,9 @@ const STORAGE_KEYS = {
   SYNC_QUEUE: 'ifspl_amc_sync_queue',
   TEMPLATE_MAPPINGS: 'ifspl_amc_template_mappings',
   EQUIPMENT_MASTER: 'ifspl_amc_equipment_master',
-  PLANT_TECHNICIANS: 'ifspl_amc_plant_technicians'
+  PLANT_TECHNICIANS: 'ifspl_amc_plant_technicians',
+  QR_REGISTRY: 'ifspl_amc_qr_registry',
+  QR_SEQUENCE: 'ifspl_amc_qr_sequence'
 };
 
 // Initialize default storage if empty
@@ -71,6 +73,67 @@ export function initStorage() {
   }
   if (!localStorage.getItem(STORAGE_KEYS.PLANT_TECHNICIANS)) {
     localStorage.setItem(STORAGE_KEYS.PLANT_TECHNICIANS, JSON.stringify(DEFAULT_PLANT_TECHNICIANS));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.QR_REGISTRY)) {
+    // Populate permanent QR registry with initial seed data:
+    // 1. Initial pre-printed Available labels batch (SR. NO. 001 to SR. NO. 050)
+    // 2. Already assigned assets from DEMO_POSITIONS
+    const initialRegistry = [];
+    const positions = JSON.parse(localStorage.getItem(STORAGE_KEYS.POSITIONS) || '[]') || DEMO_POSITIONS;
+
+    // Seed initial batch of 50 available QR labels
+    for (let s = 1; s <= 50; s++) {
+      const padded = String(s).padStart(6, '0');
+      initialRegistry.push({
+        id: `QR-REC-${padded}`,
+        token: `IFS-QR-${padded}`,
+        displayNo: `SR. NO. ${String(s).padStart(3, '0')}`,
+        seqNumber: s,
+        batchId: 'BATCH-20261001-001',
+        batchLabel: 'Batch BATCH-20261001-001 (50 Labels)',
+        generatedDate: '01/10/2026',
+        generatedTime: '09:00:00 AM',
+        generatedAt: '2026-10-01T03:30:00.000Z',
+        generatedBy: 'Ramesh Patel (Admin)',
+        assignmentStatus: 'Available',
+        linkedAssetId: null,
+        linkedPositionId: null,
+        linkedAssetName: null,
+        assignedDate: null,
+        assignedBy: null,
+        lifecycleStatus: 'Active'
+      });
+    }
+
+    // Register existing demo positions as Assigned
+    positions.forEach((pos, idx) => {
+      const seq = 100 + idx + 1;
+      const padded = String(seq).padStart(6, '0');
+      const token = pos.qrCode || `IFS-QR-${pos.positionId}`;
+      initialRegistry.push({
+        id: `QR-REC-${padded}`,
+        token: token,
+        displayNo: `SR. NO. ${String(seq).padStart(3, '0')}`,
+        seqNumber: seq,
+        batchId: 'BATCH-INITIAL-ASSIGNED',
+        batchLabel: 'Initial Site Assets Batch',
+        generatedDate: '01/10/2026',
+        generatedTime: '09:00:00 AM',
+        generatedAt: '2026-10-01T03:30:00.000Z',
+        generatedBy: 'System Auto-Register',
+        assignmentStatus: 'Assigned',
+        linkedAssetId: pos.positionId,
+        linkedPositionId: pos.positionId,
+        linkedAssetName: pos.equipmentType || 'Fire Safety Equipment',
+        assignedDate: '01/10/2026 09:30 AM',
+        assignedBy: 'System Auto-Register',
+        lifecycleStatus: 'Active'
+      });
+    });
+
+    localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(initialRegistry));
+    const highestSeq = Math.max(...initialRegistry.map(r => r.seqNumber || 0), 120);
+    localStorage.setItem(STORAGE_KEYS.QR_SEQUENCE, String(highestSeq));
   }
 }
 
@@ -278,6 +341,246 @@ export function getPositionById(positionId) {
   return positions.find(p => p.positionId === positionId || p.qrCode === positionId) || null;
 }
 
+// ============================================================================
+// PERMANENT QR REGISTRY & BULK GENERATION MODULE (Modules 1, 2, 3)
+// Concurrency-safe, duplicate-free, permanent registry of all QR tokens
+// ============================================================================
+
+export function getQRRegistry() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.QR_REGISTRY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('getQRRegistry error:', e);
+  }
+  return [];
+}
+
+export function getQRSequence() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.QR_SEQUENCE);
+    if (raw) return parseInt(raw, 10) || 0;
+  } catch (e) {}
+  return 0;
+}
+
+/**
+ * Find QR record from registry by token, id, display number, or scanned code
+ */
+export function getQRRecordByToken(tokenOrCode) {
+  if (!tokenOrCode || typeof tokenOrCode !== 'string') return null;
+  let clean = tokenOrCode.trim();
+
+  // Extract from full URL or query parameters if needed
+  try {
+    if (clean.includes('?') || clean.includes('&')) {
+      const queryPart = clean.split('?')[1] || clean;
+      const params = new URLSearchParams(queryPart);
+      clean = params.get('scan') || params.get('pos') || params.get('qr') || params.get('id') || clean;
+    }
+    if (clean.includes('#')) {
+      clean = clean.split('#')[1] || clean;
+    }
+    if (clean.includes('/') && (clean.startsWith('http://') || clean.startsWith('https://'))) {
+      const parts = clean.split('/').filter(Boolean);
+      clean = parts[parts.length - 1];
+    }
+  } catch (e) {}
+
+  const cleanUpper = clean.toUpperCase();
+  const registry = getQRRegistry();
+
+  return registry.find(r => {
+    const rToken = (r.token || '').toUpperCase();
+    const rId = (r.id || '').toUpperCase();
+    const rDisp = (r.displayNo || '').toUpperCase();
+    return rToken === cleanUpper || 
+           rId === cleanUpper || 
+           rDisp === cleanUpper ||
+           (rToken.length > 5 && cleanUpper.includes(rToken)) ||
+           (cleanUpper.length > 5 && rToken.includes(cleanUpper));
+  }) || null;
+}
+
+/**
+ * Generate bulk QR codes in advance without entering asset details (Module 1)
+ * Guarantees permanent unique numbering that never restarts from 1
+ */
+export function generateBulkQRCodes(quantity, options = {}) {
+  const qty = parseInt(quantity, 10);
+  if (isNaN(qty) || qty <= 0) {
+    return { success: false, error: 'Invalid quantity: Must be a positive integer.' };
+  }
+
+  const registry = getQRRegistry();
+  let currentSeq = getQRSequence();
+
+  // Concurrency-safe: compute highest existing sequence in registry
+  registry.forEach(r => {
+    if (r.seqNumber && r.seqNumber > currentSeq) {
+      currentSeq = r.seqNumber;
+    }
+  });
+
+  const now = new Date();
+  const dateFormatted = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeFormatted = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const batchDateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const batchId = options.batchId || `BATCH-${batchDateStr}-${String(Date.now()).slice(-4)}`;
+  const generatedBy = options.generatedBy || 'Ramesh Patel (Admin)';
+
+  const newRecords = [];
+  const startSeq = currentSeq + 1;
+  const endSeq = currentSeq + qty;
+
+  for (let s = startSeq; s <= endSeq; s++) {
+    const padded = String(s).padStart(6, '0');
+    const token = `IFS-QR-${padded}`;
+    const displayNo = `SR. NO. ${String(s).padStart(3, '0')}`;
+
+    // Duplicate prevention check across all existing records
+    if (registry.some(r => r.token === token || r.seqNumber === s)) {
+      continue;
+    }
+
+    const record = {
+      id: `QR-REC-${padded}`,
+      token: token,
+      displayNo: displayNo,
+      seqNumber: s,
+      batchId: batchId,
+      batchLabel: options.batchLabel || `Batch ${batchId} (${qty} Labels)`,
+      generatedDate: dateFormatted,
+      generatedTime: timeFormatted,
+      generatedAt: now.toISOString(),
+      generatedBy: generatedBy,
+      assignmentStatus: 'Available', // 'Available' | 'Assigned' | 'Inactive'
+      linkedAssetId: null,
+      linkedPositionId: null,
+      linkedAssetName: null,
+      assignedDate: null,
+      assignedBy: null,
+      lifecycleStatus: 'Active' // 'Active' | 'Damaged' | 'Retired'
+    };
+
+    newRecords.push(record);
+    registry.push(record);
+  }
+
+  // Atomically update sequence and registry
+  localStorage.setItem(STORAGE_KEYS.QR_SEQUENCE, String(endSeq));
+  localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+
+  // Dispatch live notification event
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ifspl:qr_registry_updated', { 
+      detail: { batchId, count: newRecords.length, startSeq, endSeq } 
+    }));
+  }
+
+  return {
+    success: true,
+    batchId,
+    startSeq,
+    endSeq,
+    count: newRecords.length,
+    records: newRecords
+  };
+}
+
+/**
+ * Assign an existing QR code to an asset (Module 3)
+ * Prevents duplicate assignment and binds the QR token permanently
+ */
+export function assignQRToAsset(qrToken, assetPositionId, assetName, options = {}) {
+  if (!qrToken || !assetPositionId) {
+    return { success: false, error: 'Both QR Token and Asset Position ID are required for assignment.' };
+  }
+
+  const registry = getQRRegistry();
+  const tokenUpper = qrToken.trim().toUpperCase();
+
+  let recIndex = registry.findIndex(r => 
+    r.token.toUpperCase() === tokenUpper || 
+    r.id.toUpperCase() === tokenUpper ||
+    r.displayNo.toUpperCase() === tokenUpper
+  );
+
+  const now = new Date();
+  const dateFormatted = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-US');
+
+  if (recIndex === -1) {
+    // If not in registry (e.g. legacy direct position), create the permanent assigned record
+    const seq = registry.length + 1;
+    const newRec = {
+      id: `QR-REC-${String(seq).padStart(6, '0')}`,
+      token: qrToken,
+      displayNo: `SR. NO. ${String(seq).padStart(3, '0')}`,
+      seqNumber: seq,
+      batchId: 'BATCH-DIRECT-ASSIGN',
+      batchLabel: 'Direct Registration',
+      generatedDate: now.toLocaleDateString('en-GB'),
+      generatedTime: now.toLocaleTimeString('en-US'),
+      generatedAt: now.toISOString(),
+      generatedBy: options.assignedBy || 'Technician',
+      assignmentStatus: 'Assigned',
+      linkedAssetId: assetPositionId,
+      linkedPositionId: assetPositionId,
+      linkedAssetName: assetName || 'Fire Protection Equipment',
+      assignedDate: dateFormatted,
+      assignedBy: options.assignedBy || 'Technician',
+      lifecycleStatus: 'Active'
+    };
+    registry.push(newRec);
+    localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+    return { success: true, record: newRec };
+  }
+
+  const record = registry[recIndex];
+
+  // Check duplicate assignment: If already assigned to another asset, strictly prohibit
+  if (record.assignmentStatus === 'Assigned' && record.linkedPositionId && record.linkedPositionId !== assetPositionId) {
+    return { 
+      success: false, 
+      error: `Duplicate Assignment Error: QR Code ${record.displayNo} (${record.token}) is already assigned to asset ${record.linkedPositionId}. Each QR code can only be assigned to one physical asset.` 
+    };
+  }
+
+  record.assignmentStatus = 'Assigned';
+  record.linkedAssetId = assetPositionId;
+  record.linkedPositionId = assetPositionId;
+  record.linkedAssetName = assetName || record.linkedAssetName || 'Fire Protection Equipment';
+  record.assignedDate = dateFormatted;
+  record.assignedAtIso = now.toISOString();
+  record.assignedBy = options.assignedBy || 'Ramesh Patel (Field Technician)';
+
+  registry[recIndex] = record;
+  localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ifspl:qr_registry_updated', { 
+      detail: { token: record.token, assetId: assetPositionId } 
+    }));
+  }
+
+  return { success: true, record };
+}
+
+/**
+ * Retrieve batch of QR codes for reprinting without changing tokens (Module 2)
+ */
+export function getQRRecordsForReprint(batchId = null, tokenList = null) {
+  const registry = getQRRegistry();
+  if (batchId) {
+    return registry.filter(r => r.batchId === batchId);
+  }
+  if (tokenList && Array.isArray(tokenList)) {
+    const set = new Set(tokenList.map(t => t.toUpperCase()));
+    return registry.filter(r => set.has(r.token.toUpperCase()) || set.has(r.id.toUpperCase()));
+  }
+  return registry;
+}
+
 export function getPositionByQR(qrCode) {
   if (!qrCode || typeof qrCode !== 'string') return null;
   const positions = getPositions();
@@ -304,6 +607,13 @@ export function getPositionByQR(qrCode) {
 
   const cleanUpper = cleanCode.trim().toUpperCase();
 
+  // First check if this token is registered in the permanent QR registry and assigned to a position
+  const qrRec = getQRRecordByToken(cleanCode);
+  if (qrRec && qrRec.assignmentStatus === 'Assigned' && qrRec.linkedPositionId) {
+    const linked = positions.find(p => p.positionId === qrRec.linkedPositionId || p.qrCode === qrRec.token);
+    if (linked) return linked;
+  }
+
   return positions.find(p => {
     const pQr = (p.qrCode || '').toUpperCase();
     const pPosId = (p.positionId || '').toUpperCase();
@@ -324,11 +634,24 @@ export function getPositionByQR(qrCode) {
 /**
  * Resolve asset position for QR scan with query param fallback
  * Handles cross-device scans (e.g. registered on PC, scanned on mobile)
+ * Also detects unassigned QR codes for immediate field registration
  */
 export function resolveScannedAssetPosition(scanCode, urlParams = null) {
   if (!scanCode) return null;
   const match = getPositionByQR(scanCode);
   if (match) return match;
+
+  // Check if this is an unassigned QR code in the registry (Module 3: Step 1)
+  const qrRec = getQRRecordByToken(scanCode);
+  if (qrRec && qrRec.assignmentStatus === 'Available') {
+    return {
+      isUnassignedQR: true,
+      qrRecord: qrRec,
+      qrToken: qrRec.token,
+      displayNo: qrRec.displayNo,
+      seqNumber: qrRec.seqNumber
+    };
+  }
 
   try {
     const params = urlParams || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null);
@@ -844,10 +1167,25 @@ export function registerNewAsset(assetData) {
   // Format: IFS-POS-000101 (or site-prefixed sequential code)
   const currentCount = positions.length;
   const seqNumber = String(100 + currentCount + 1).padStart(6, '0');
-  const permanentPositionCode = `IFS-POS-${seqNumber}`;
+  const permanentPositionCode = assetData.positionId || `IFS-POS-${seqNumber}`;
   
-  // Stable, opaque QR identifier
-  const qrToken = `IFS-QR-${permanentPositionCode}`;
+  // Stable, opaque QR identifier (either from pre-printed scanned QR or generated)
+  let qrToken = assetData.assignedQRToken || assetData.qrCode;
+
+  if (qrToken) {
+    const regRec = getQRRecordByToken(qrToken);
+    if (regRec) {
+      if (regRec.assignmentStatus === 'Assigned' && regRec.linkedPositionId && regRec.linkedPositionId !== permanentPositionCode) {
+        return {
+          success: false,
+          error: `Duplicate Assignment Error: QR Code "${regRec.displayNo}" (${regRec.token}) is already assigned to asset ${regRec.linkedPositionId}. Each QR code can only be assigned to one physical asset.`
+        };
+      }
+      qrToken = regRec.token;
+    }
+  } else {
+    qrToken = `IFS-QR-${permanentPositionCode}`;
+  }
 
   const targetSite = sites.find(s => s.id === assetData.siteId) || { name: 'Industrial Facility', clientContact: 'Site Safety Head' };
 
@@ -925,6 +1263,11 @@ export function registerNewAsset(assetData) {
 
   positions.unshift(newPosition);
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
+
+  // Permanently bind this QR token in the permanent QR Registry!
+  assignQRToAsset(qrToken, permanentPositionCode, assetData.equipmentName || assetData.equipmentType, {
+    assignedBy: assetData.assignedBy || 'Technician'
+  });
 
   // Update site positions count and coverage
   updateSiteProgress(assetData.siteId);

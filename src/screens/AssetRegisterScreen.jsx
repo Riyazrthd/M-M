@@ -26,7 +26,7 @@ import {
   Link as LinkIcon
 } from 'lucide-react';
 
-export default function AssetRegisterScreen({ onNavigate, onAssetRegistered }) {
+export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, prefilledQR }) {
   const sites = getSites();
 
   // Wizard Step State (1: Client & Site, 2: Equipment, 3: Checklist Mapping, 4: Review, 5: Sticker)
@@ -241,7 +241,8 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered }) {
       nextHptDueDate,
       initialCondition,
       technicianRemarks,
-      photo: photos[0]?.url || null
+      photo: photos[0]?.url || null,
+      assignedQRToken: prefilledQR?.token || null
     };
 
     const result = registerNewAsset(payload);
@@ -388,6 +389,56 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered }) {
           </div>
         )}
       </div>
+
+      {/* Pre-Printed Physical QR Binding Banner (Module 3) */}
+      {prefilledQR && (
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: '8px',
+          backgroundColor: '#EFF6FF',
+          border: '1px solid #BFDBFE',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '8px',
+            backgroundColor: '#DBEAFE',
+            color: '#1D4ED8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <QrCode size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1E3A8A' }}>
+                Binding to Pre-Printed QR Label: {prefilledQR.displayNo}
+              </span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#1E40AF',
+                backgroundColor: '#DBEAFE',
+                padding: '2px 8px',
+                borderRadius: '4px'
+              }}>
+                {prefilledQR.batchId || 'Advance Bulk Batch'}
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#3B82F6', marginTop: '3px' }}>
+              Permanent Token: <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{prefilledQR.token}</code> &bull; Scanned in field &bull; Unassigned
+            </div>
+            <div style={{ fontSize: '11.5px', color: '#60A5FA', marginTop: '2px' }}>
+              Upon completing this registration, this physical sticker will be permanently linked to this equipment in the QR Registry.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Alert */}
       {errorMessage && (
@@ -1252,13 +1303,21 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered }) {
           <div style={{
             padding: '12px 14px',
             borderRadius: 'var(--radius-sm)',
-            backgroundColor: '#EFF6FF',
-            border: '1px solid #BFDBFE',
+            backgroundColor: prefilledQR ? '#EFF6FF' : '#F0FDF4',
+            border: `1px solid ${prefilledQR ? '#BFDBFE' : '#BBF7D0'}`,
             fontSize: '0.82rem',
-            color: '#1E40AF',
+            color: prefilledQR ? '#1E40AF' : '#166534',
             lineHeight: 1.4
           }}>
-            <strong>Automatic Generation Sequence:</strong> Submitting will record this physical unit, generate a unique permanent Position Code (e.g. <code>IFS-POS-xxxxxx</code>) and an immutable QR Code.
+            {prefilledQR ? (
+              <>
+                <strong>Binding to Pre-Printed QR Label:</strong> Submitting will record this physical unit and permanently bind it to Pre-Printed QR Label <strong>{prefilledQR.displayNo}</strong> (<code>{prefilledQR.token}</code>). Its status in the permanent registry will become <strong>Assigned</strong>.
+              </>
+            ) : (
+              <>
+                <strong>Automatic Generation Sequence:</strong> Submitting will record this physical unit, generate a unique permanent Position Code (e.g. <code>IFS-POS-xxxxxx</code>) and an immutable QR Code.
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
