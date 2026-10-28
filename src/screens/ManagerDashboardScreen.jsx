@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, getPositions, getVisits, getCurrentUser, getQRRegistry, getPendingAssetsForSite, VALID_PENDING_REASONS } from '../data/storage';
+import { 
+  getSites, getPositions, getVisits, getCurrentUser, getQRRegistry, 
+  getPendingAssetsForSite, VALID_PENDING_REASONS,
+  isFireExtinguisherAsset, getRegisteredExtinguishers, getTotalExtinguishersCount, getClientExtinguisherBreakdown
+} from '../data/storage';
 import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
 import { downloadPendingAssetsExcel, downloadPendingAssetsCSV } from '../utils/pendingAssetExporter';
+import { downloadClientExtinguishersCSV, downloadClientExtinguishersExcel, printClientExtinguishersReport } from '../utils/extinguisherExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
   Building2, ShieldCheck, AlertTriangle, Calendar, CheckCircle2, 
   TrendingUp, TrendingDown, FileCheck, ArrowRight, ArrowUpRight, BarChart3,
-  ExternalLink, Search, Download, PlusCircle, QrCode, Flame,
-  Clock, ChevronRight, Sparkles, FileSpreadsheet, Database,
+  ExternalLink, Search, Download, PlusCircle, QrCode, Flame, FireExtinguisher,
+  Clock, ChevronRight, Sparkles, FileSpreadsheet, Database, Printer, ChevronLeft, ArrowUpDown,
   Activity, Zap, Target, AlertCircle, Check, Eye, X, Filter
 } from 'lucide-react';
 
@@ -131,7 +136,7 @@ function Card({ children, style={}, onClick }) {
 }
 
 /* ── MNC Enterprise KPI Card (Exact Requested Style) ────────── */
-function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHoverColor = '#0B6B63' }) {
+function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHoverColor = '#0B6B63', icon = null }) {
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -162,8 +167,12 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
           transition: 'color 0.15s ease',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          textOverflow: 'ellipsis',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px'
         }}>
+          {icon}
           {title}
         </span>
         <svg
@@ -768,6 +777,19 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   const [selectedJustificationVisit, setSelectedJustificationVisit] = useState(null);
   const [visitFilter, setVisitFilter] = useState('ALL');
 
+  // Fire Extinguisher Inventory & Client Breakdown state
+  const [extinguisherView, setExtinguisherView] = useState(null); // null | 'BREAKDOWN' | 'REPORT'
+  const [selectedExtClient, setSelectedExtClient] = useState(null);
+  const [breakdownSearch, setBreakdownSearch] = useState('');
+  const [breakdownSort, setBreakdownSort] = useState('desc'); // 'desc' | 'asc'
+  const [breakdownPage, setBreakdownPage] = useState(1);
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportTypeFilter, setReportTypeFilter] = useState('ALL');
+  const [reportCapacityFilter, setReportCapacityFilter] = useState('ALL');
+  const [reportStatusFilter, setReportStatusFilter] = useState('ALL');
+  const [reportSiteFilter, setReportSiteFilter] = useState('ALL');
+  const [reportPage, setReportPage] = useState(1);
+
   // Real Data Modal drill-down state
   const [modalCategory,      setModalCategory]      = useState(null);
   const [modalSearchQuery,   setModalSearchQuery]   = useState('');
@@ -776,16 +798,21 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        if (extinguisherView === 'REPORT') {
+          setExtinguisherView('BREAKDOWN');
+        } else if (extinguisherView === 'BREAKDOWN') {
+          setExtinguisherView(null);
+        }
         setModalCategory(null);
         setModalSearchQuery('');
         setModalStatusFilter('ALL');
       }
     };
-    if (modalCategory) {
+    if (modalCategory || extinguisherView) {
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modalCategory]);
+  }, [modalCategory, extinguisherView]);
 
   // KPI computations
   const totalPositions     = sites.reduce((a, s) => a + (s.totalPositions || 0), 0);
@@ -797,6 +824,11 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   const hydroTests         = positions.filter(p => p.templateId === 'CL-11' && p.currentEquipment?.nextHydroTestDue);
   const totalExtinguishers = positions.filter(p => p.templateId === 'CL-11').length;
   const totalHoseBoxes     = positions.filter(p => p.templateId === 'CL-03').length;
+
+  // Actual Registered Fire Extinguishers inventory computation (excluding unassigned QR / other asset types)
+  const registeredExtinguishers = getRegisteredExtinguishers();
+  const totalRegisteredExtinguishers = registeredExtinguishers.length;
+  const clientBreakdown = getClientExtinguisherBreakdown();
 
   const filteredPositions = positions.filter(p => {
     const q = searchQuery.toLowerCase();
@@ -1034,6 +1066,30 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             gap: 8px;
           }
         }
+        .kpi-row-5 {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 12px;
+          width: 100%;
+        }
+        @media (max-width: 1180px) {
+          .kpi-row-5 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+          }
+        }
+        @media (max-width: 768px) {
+          .kpi-row-5 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+        }
+        @media (max-width: 480px) {
+          .kpi-row-5 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 8px;
+          }
+        }
         .metric-strip-6 {
           display: grid;
           grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1166,9 +1222,24 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
       )}
 
-      {/* ═══ 2. PRIMARY KPI CARDS (4 Balanced Columns – Zero Blank Right Space) ════════ */}
-      <div className="dash-row kpi-row-4">
-        {/* KPI 1 – Coverage */}
+      {/* ═══ 2. PRIMARY KPI CARDS (5 Balanced Columns – Asset Inventory & Compliance) ════════ */}
+      <div className="dash-row kpi-row-5">
+        {/* KPI 1 – Fire Extinguishers (CLICKABLE INVENTORY BREAKDOWN) */}
+        <MncKpiCard
+          icon={<FireExtinguisher size={13} style={{ color: '#DC2626', flexShrink: 0 }} />}
+          title="Fire Extinguishers"
+          value={totalRegisteredExtinguishers.toLocaleString()}
+          inlineStatus={`${clientBreakdown.length} clients`}
+          bottomText="Registered Assets"
+          accentHoverColor="#DC2626"
+          onClick={() => {
+            setExtinguisherView('BREAKDOWN');
+            setBreakdownSearch('');
+            setBreakdownPage(1);
+          }}
+        />
+
+        {/* KPI 2 – Coverage */}
         <MncKpiCard
           title="Inspection coverage"
           value={`${coveragePct}%`}
@@ -1177,7 +1248,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           onClick={() => setModalCategory('SLA')}
         />
 
-        {/* KPI 2 – HPT Due */}
+        {/* KPI 3 – HPT Due */}
         <MncKpiCard
           title="Cylinders due for HPT (CL-11)"
           value={hydroTests.length}
@@ -1186,7 +1257,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           onClick={() => setModalCategory('CL-11')}
         />
 
-        {/* KPI 3 – Defect Alerts */}
+        {/* KPI 4 – Defect Alerts */}
         <MncKpiCard
           title="Stock / Spares alerts"
           value={defectPositions.length}
@@ -1195,7 +1266,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           onClick={() => setModalCategory('DEFECTS')}
         />
 
-        {/* KPI 4 – Total Positions */}
+        {/* KPI 5 – Total Positions */}
         <MncKpiCard
           title="Contracted AMC positions"
           value={totalPositions}
@@ -2952,6 +3023,920 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ FIRE EXTINGUISHER INVENTORY BREAKDOWN & REPORT MODAL ═══ */}
+      {extinguisherView && (() => {
+        const isReport = extinguisherView === 'REPORT' && selectedExtClient;
+        const grandTotal = clientBreakdown.reduce((sum, c) => sum + c.totalExtinguishers, 0);
+        const grandInspected = clientBreakdown.reduce((sum, c) => sum + c.inspectedCount, 0);
+        const grandAttention = clientBreakdown.reduce((sum, c) => sum + c.attentionCount, 0);
+        const grandPending = clientBreakdown.reduce((sum, c) => sum + c.pendingCount, 0);
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px'
+            }}
+            onClick={() => setExtinguisherView(null)}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFF',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: isReport ? '1180px' : '980px',
+                maxHeight: '92vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                transition: 'max-width 0.2s ease'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header with Navigation Breadcrumb */}
+              <div style={{
+                padding: '16px 20px',
+                borderBottom: `1px solid ${DS.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#F8FAFC'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#FEF2F2',
+                    color: '#DC2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <FireExtinguisher size={18} />
+                  </div>
+                  
+                  {/* Breadcrumb path */}
+                  <nav aria-label="Breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <button
+                      onClick={() => setExtinguisherView(null)}
+                      style={{
+                        background: 'none', border: 'none', padding: 0,
+                        color: DS.textMuted, cursor: 'pointer', fontWeight: 500
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = DS.navy}
+                      onMouseLeave={e => e.currentTarget.style.color = DS.textMuted}
+                    >
+                      Dashboard
+                    </button>
+                    <ChevronRight size={13} color="#94A3B8" />
+                    
+                    <button
+                      onClick={() => setExtinguisherView('BREAKDOWN')}
+                      style={{
+                        background: 'none', border: 'none', padding: 0,
+                        color: isReport ? DS.textMuted : DS.textPrimary,
+                        cursor: isReport ? 'pointer' : 'default',
+                        fontWeight: isReport ? 500 : 700
+                      }}
+                      onMouseEnter={e => { if (isReport) e.currentTarget.style.color = DS.navy; }}
+                      onMouseLeave={e => { if (isReport) e.currentTarget.style.color = DS.textMuted; }}
+                    >
+                      Fire Extinguisher Inventory
+                    </button>
+
+                    {isReport && (
+                      <>
+                        <ChevronRight size={13} color="#94A3B8" />
+                        <span style={{ fontWeight: 700, color: DS.textPrimary }}>
+                          {selectedExtClient.clientName}
+                        </span>
+                      </>
+                    )}
+                  </nav>
+                </div>
+
+                <button
+                  onClick={() => setExtinguisherView(null)}
+                  style={{
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    color: DS.textMuted, padding: '4px', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center'
+                  }}
+                  title="Close (Esc)"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* ──────────────────────────────────────────────────────────── */}
+              {/* VIEW 1: CLIENT-WISE BREAKDOWN TABLE                          */}
+              {/* ──────────────────────────────────────────────────────────── */}
+              {!isReport && (() => {
+                const q = breakdownSearch.trim().toLowerCase();
+                let filteredClients = clientBreakdown.filter(c => 
+                  !q || 
+                  c.clientName.toLowerCase().includes(q) || 
+                  c.siteName.toLowerCase().includes(q) || 
+                  c.city.toLowerCase().includes(q)
+                );
+
+                filteredClients.sort((a, b) => {
+                  if (breakdownSort === 'asc') return a.totalExtinguishers - b.totalExtinguishers;
+                  return b.totalExtinguishers - a.totalExtinguishers;
+                });
+
+                const pageSize = 8;
+                const totalPages = Math.ceil(filteredClients.length / pageSize) || 1;
+                const paginatedClients = filteredClients.slice((breakdownPage - 1) * pageSize, breakdownPage * pageSize);
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                    {/* KPI Strip across all clients */}
+                    <div style={{
+                      padding: '14px 20px',
+                      backgroundColor: '#FFFFFF',
+                      borderBottom: `1px solid ${DS.border}`,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                      gap: '12px'
+                    }}>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                        <div style={{ fontSize: '11px', color: '#991B1B', fontWeight: 600 }}>Total Extinguishers</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#DC2626' }}>{grandTotal.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                        <div style={{ fontSize: '11px', color: '#166534', fontWeight: 600 }}>Verified OK</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#16A34A' }}>{grandInspected.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                        <div style={{ fontSize: '11px', color: '#92400E', fontWeight: 600 }}>Needs Attention</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#D97706' }}>{grandAttention.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: '11px', color: '#475569', fontWeight: 600 }}>Pending Inspection</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#64748B' }}>{grandPending.toLocaleString()}</div>
+                      </div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+                        <div style={{ fontSize: '11px', color: '#1E40AF', fontWeight: 600 }}>Active Clients</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#2563EB' }}>{clientBreakdown.length}</div>
+                      </div>
+                    </div>
+
+                    {/* Search & Sort Controls Toolbar */}
+                    <div style={{
+                      padding: '12px 20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      borderBottom: `1px solid ${DS.border}`,
+                      backgroundColor: '#FAFAFA',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ position: 'relative', flex: 1, minWidth: '220px', maxWidth: '420px' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                        <input
+                          type="text"
+                          value={breakdownSearch}
+                          onChange={e => { setBreakdownSearch(e.target.value); setBreakdownPage(1); }}
+                          placeholder="Search clients by name, facility or city..."
+                          style={{
+                            width: '100%',
+                            height: '34px',
+                            padding: '0 12px 0 32px',
+                            borderRadius: '8px',
+                            border: `1px solid ${DS.border}`,
+                            fontSize: '12.5px',
+                            backgroundColor: '#FFF',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => setBreakdownSort(s => s === 'desc' ? 'asc' : 'desc')}
+                          style={{
+                            height: '34px',
+                            padding: '0 12px',
+                            borderRadius: '8px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#FFF',
+                            color: DS.textSec,
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <ArrowUpDown size={13} />
+                          Sort: Quantity ({breakdownSort === 'desc' ? 'Highest first' : 'Lowest first'})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${DS.border}` }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '45px', color: '#64748B', fontWeight: 600 }}>#</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Client Organization</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Primary Plant / Site</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Inventory Types Breakdown</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#64748B', fontWeight: 600 }}>Status Summary</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#64748B', fontWeight: 600 }}>Total Units</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '110px', color: '#64748B', fontWeight: 600 }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedClients.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: DS.textMuted }}>
+                                No client fire extinguisher records match your search query.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedClients.map((client, idx) => {
+                              const globalIndex = (breakdownPage - 1) * pageSize + idx + 1;
+                              return (
+                                <tr
+                                  key={client.clientName}
+                                  onClick={() => {
+                                    setSelectedExtClient(client);
+                                    setExtinguisherView('REPORT');
+                                    setReportSearch('');
+                                    setReportTypeFilter('ALL');
+                                    setReportCapacityFilter('ALL');
+                                    setReportStatusFilter('ALL');
+                                    setReportSiteFilter('ALL');
+                                    setReportPage(1);
+                                  }}
+                                  style={{
+                                    borderBottom: `1px solid ${DS.border}`,
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.12s ease'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#F8FAFC'}
+                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                                >
+                                  <td style={{ padding: '12px 14px', textAlign: 'center', color: '#94A3B8', fontWeight: 600 }}>
+                                    {globalIndex}
+                                  </td>
+                                  <td style={{ padding: '12px 14px' }}>
+                                    <div style={{ fontWeight: 600, color: DS.textPrimary }}>
+                                      {client.clientName}
+                                    </div>
+                                    {client.city && (
+                                      <div style={{ fontSize: '11px', color: DS.textMuted }}>
+                                        {client.city}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '12px 14px', color: DS.textSec }}>
+                                    {client.siteName}
+                                  </td>
+                                  <td style={{ padding: '12px 14px' }}>
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                      {Object.entries(client.typesBreakdown).map(([t, count]) => (
+                                        <span
+                                          key={t}
+                                          style={{
+                                            fontSize: '11px',
+                                            padding: '2px 7px',
+                                            borderRadius: '4px',
+                                            backgroundColor: '#F1F5F9',
+                                            color: '#334155',
+                                            fontWeight: 500
+                                          }}
+                                        >
+                                          {t}: <strong>{count}</strong>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                    <div style={{ display: 'inline-flex', gap: '5px' }}>
+                                      {client.inspectedCount > 0 && (
+                                        <span style={{ fontSize: '10.5px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#DCFCE7', color: '#15803D', fontWeight: 600 }}>
+                                          {client.inspectedCount} OK
+                                        </span>
+                                      )}
+                                      {client.attentionCount > 0 && (
+                                        <span style={{ fontSize: '10.5px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#FEE2E2', color: '#B91C1C', fontWeight: 600 }}>
+                                          {client.attentionCount} Attn
+                                        </span>
+                                      )}
+                                      {client.pendingCount > 0 && (
+                                        <span style={{ fontSize: '10.5px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#64748B', fontWeight: 600 }}>
+                                          {client.pendingCount} Pend
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                    <span style={{
+                                      fontSize: '16px',
+                                      fontWeight: 700,
+                                      color: '#DC2626',
+                                      letterSpacing: '-0.02em',
+                                      fontVariantNumeric: 'tabular-nums'
+                                    }}>
+                                      {client.totalExtinguishers.toLocaleString()}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        color: '#0B6B63',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px'
+                                      }}
+                                    >
+                                      Report <ArrowRight size={11} />
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                        {/* Grand Total Footer Row */}
+                        <tfoot>
+                          <tr style={{ backgroundColor: '#F1F5F9', borderTop: `2px solid ${DS.border}` }}>
+                            <td colSpan={3} style={{ padding: '12px 14px', fontWeight: 700, color: DS.textPrimary }}>
+                              Grand Total ({clientBreakdown.length} Contracted Clients)
+                            </td>
+                            <td style={{ padding: '12px 14px', color: DS.textSec, fontSize: '11.5px' }}>
+                              All registered extinguisher assets across database
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: DS.textSec }}>
+                                {grandInspected} OK · {grandAttention} Attn · {grandPending} Pend
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                              <span style={{ fontSize: '18px', fontWeight: 800, color: '#DC2626', fontVariantNumeric: 'tabular-nums' }}>
+                                {grandTotal.toLocaleString()}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {/* Breakdown Pagination Footer */}
+                    <div style={{
+                      padding: '12px 20px',
+                      borderTop: `1px solid ${DS.border}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: '#F8FAFC'
+                    }}>
+                      <div style={{ fontSize: '12px', color: DS.textMuted }}>
+                        Showing {paginatedClients.length} of {filteredClients.length} clients ({grandTotal.toLocaleString()} total extinguishers)
+                      </div>
+                      {totalPages > 1 && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            disabled={breakdownPage <= 1}
+                            onClick={() => setBreakdownPage(p => Math.max(1, p - 1))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: `1px solid ${DS.border}`,
+                              backgroundColor: '#FFF',
+                              fontSize: '11px',
+                              cursor: breakdownPage <= 1 ? 'not-allowed' : 'pointer',
+                              opacity: breakdownPage <= 1 ? 0.5 : 1
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <span style={{ fontSize: '11px', alignSelf: 'center', color: DS.textSec }}>
+                            Page {breakdownPage} of {totalPages}
+                          </span>
+                          <button
+                            disabled={breakdownPage >= totalPages}
+                            onClick={() => setBreakdownPage(p => Math.min(totalPages, p + 1))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              border: `1px solid ${DS.border}`,
+                              backgroundColor: '#FFF',
+                              fontSize: '11px',
+                              cursor: breakdownPage >= totalPages ? 'not-allowed' : 'pointer',
+                              opacity: breakdownPage >= totalPages ? 0.5 : 1
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ──────────────────────────────────────────────────────────── */}
+              {/* VIEW 2: COMPLETE CLIENT EXTINGUISHER REPORT                  */}
+              {/* ──────────────────────────────────────────────────────────── */}
+              {isReport && (() => {
+                const client = selectedExtClient;
+                const clientExtinguishers = client.extinguishers || getRegisteredExtinguishers(client.siteId || client.clientName);
+
+                // Available dynamic filter options
+                const availableTypes = [...new Set(clientExtinguishers.map(e => e.currentEquipment?.type || e.equipmentType).filter(Boolean))];
+                const availableCapacities = [...new Set(clientExtinguishers.map(e => e.currentEquipment?.capacity).filter(Boolean))];
+                const availableSites = [...new Set(clientExtinguishers.map(e => e.siteName || siteName(e)).filter(Boolean))];
+
+                // Filtering
+                const sq = reportSearch.trim().toLowerCase();
+                const filteredReport = clientExtinguishers.filter(e => {
+                  const posId = (e.positionId || e.id || '').toLowerCase();
+                  const qr = (e.qrCode || e.qrToken || '').toLowerCase();
+                  const sn = (e.currentEquipment?.serialNo || e.currentEquipment?.serialNumber || '').toLowerCase();
+                  const loc = (e.locationDescription || e.location || e.area || '').toLowerCase();
+                  const eqT = (e.currentEquipment?.type || e.equipmentType || '').toLowerCase();
+
+                  const matchSearch = !sq || posId.includes(sq) || qr.includes(sq) || sn.includes(sq) || loc.includes(sq) || eqT.includes(sq);
+
+                  const currentT = e.currentEquipment?.type || e.equipmentType;
+                  const matchType = reportTypeFilter === 'ALL' || currentT === reportTypeFilter;
+                  const matchCap = reportCapacityFilter === 'ALL' || (e.currentEquipment?.capacity || '') === reportCapacityFilter;
+                  const matchStatus = reportStatusFilter === 'ALL' ||
+                    (reportStatusFilter === 'OK' && e.inspectionStatus === 'Inspected - OK') ||
+                    (reportStatusFilter === 'ATTENTION' && e.inspectionStatus === 'Inspected - Attention') ||
+                    (reportStatusFilter === 'PENDING' && (!e.inspectionStatus || e.inspectionStatus.includes('Pending')));
+                  const matchSite = reportSiteFilter === 'ALL' || (e.siteName || siteName(e)) === reportSiteFilter;
+
+                  return matchSearch && matchType && matchCap && matchStatus && matchSite;
+                });
+
+                const reportPageSize = 12;
+                const reportTotalPages = Math.ceil(filteredReport.length / reportPageSize) || 1;
+                const paginatedReport = filteredReport.slice((reportPage - 1) * reportPageSize, reportPage * reportPageSize);
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                    {/* Top Action & Summary Bar */}
+                    <div style={{
+                      padding: '12px 20px',
+                      backgroundColor: '#FFFFFF',
+                      borderBottom: `1px solid ${DS.border}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '12px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          onClick={() => setExtinguisherView('BREAKDOWN')}
+                          style={{
+                            height: '32px',
+                            padding: '0 10px',
+                            borderRadius: '6px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#F8FAFC',
+                            color: DS.textPrimary,
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <ChevronLeft size={14} /> Back to Breakdown
+                        </button>
+                        <div>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary }}>
+                            {client.clientName}
+                          </div>
+                          <div style={{ fontSize: '11px', color: DS.textMuted }}>
+                            {client.siteName} · Total: <strong style={{ color: '#DC2626' }}>{clientExtinguishers.length} Extinguishers</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Export Actions */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => downloadClientExtinguishersExcel({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          style={{
+                            height: '32px',
+                            padding: '0 11px',
+                            borderRadius: '6px',
+                            backgroundColor: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            color: '#1D4ED8',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                          title="Export complete report to formatted Excel (.xlsx)"
+                        >
+                          <Download size={13} /> Excel (.xlsx)
+                        </button>
+                        <button
+                          onClick={() => downloadClientExtinguishersCSV({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          style={{
+                            height: '32px',
+                            padding: '0 11px',
+                            borderRadius: '6px',
+                            backgroundColor: '#F8FAFC',
+                            border: `1px solid ${DS.border}`,
+                            color: DS.textSec,
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                          title="Export report to CSV"
+                        >
+                          <FileSpreadsheet size={13} /> CSV
+                        </button>
+                        <button
+                          onClick={() => printClientExtinguishersReport({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          style={{
+                            height: '32px',
+                            padding: '0 11px',
+                            borderRadius: '6px',
+                            backgroundColor: '#F8FAFC',
+                            border: `1px solid ${DS.border}`,
+                            color: DS.textSec,
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                          title="Print or save PDF report"
+                        >
+                          <Printer size={13} /> Print / PDF
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Toolbar */}
+                    <div style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#FAFAFA',
+                      borderBottom: `1px solid ${DS.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '320px' }}>
+                        <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                        <input
+                          type="text"
+                          value={reportSearch}
+                          onChange={e => { setReportSearch(e.target.value); setReportPage(1); }}
+                          placeholder="Search Asset ID, QR, Serial, Location..."
+                          style={{
+                            width: '100%',
+                            height: '30px',
+                            padding: '0 10px 0 28px',
+                            borderRadius: '6px',
+                            border: `1px solid ${DS.border}`,
+                            fontSize: '11.5px',
+                            backgroundColor: '#FFF',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+
+                      {/* Type Filter */}
+                      <select
+                        value={reportTypeFilter}
+                        onChange={e => { setReportTypeFilter(e.target.value); setReportPage(1); }}
+                        style={{
+                          height: '30px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          border: `1px solid ${DS.border}`,
+                          backgroundColor: '#FFF',
+                          fontSize: '11.5px',
+                          color: DS.textPrimary
+                        }}
+                      >
+                        <option value="ALL">All Types ({availableTypes.length})</option>
+                        {availableTypes.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+
+                      {/* Capacity Filter */}
+                      {availableCapacities.length > 0 && (
+                        <select
+                          value={reportCapacityFilter}
+                          onChange={e => { setReportCapacityFilter(e.target.value); setReportPage(1); }}
+                          style={{
+                            height: '30px',
+                            padding: '0 8px',
+                            borderRadius: '6px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#FFF',
+                            fontSize: '11.5px',
+                            color: DS.textPrimary
+                          }}
+                        >
+                          <option value="ALL">All Capacities</option>
+                          {availableCapacities.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Status Filter */}
+                      <select
+                        value={reportStatusFilter}
+                        onChange={e => { setReportStatusFilter(e.target.value); setReportPage(1); }}
+                        style={{
+                          height: '30px',
+                          padding: '0 8px',
+                          borderRadius: '6px',
+                          border: `1px solid ${DS.border}`,
+                          backgroundColor: '#FFF',
+                          fontSize: '11.5px',
+                          color: DS.textPrimary
+                        }}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="OK">Verified OK</option>
+                        <option value="ATTENTION">Needs Attention</option>
+                        <option value="PENDING">Pending</option>
+                      </select>
+
+                      {(reportSearch || reportTypeFilter !== 'ALL' || reportCapacityFilter !== 'ALL' || reportStatusFilter !== 'ALL') && (
+                        <button
+                          onClick={() => {
+                            setReportSearch('');
+                            setReportTypeFilter('ALL');
+                            setReportCapacityFilter('ALL');
+                            setReportStatusFilter('ALL');
+                            setReportPage(1);
+                          }}
+                          style={{
+                            height: '30px',
+                            padding: '0 8px',
+                            borderRadius: '6px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#FFF',
+                            color: '#DC2626',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Detailed Report Table */}
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${DS.border}` }}>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', width: '38px', color: '#64748B' }}>#</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Asset ID</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>QR Number</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Extinguisher Type</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Capacity</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Make / Mfr</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Serial No.</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Location / Position</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Last Insp.</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Next Due</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Status</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', width: '90px', color: '#64748B' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedReport.length === 0 ? (
+                            <tr>
+                              <td colSpan={12} style={{ padding: '36px', textAlign: 'center', color: DS.textMuted }}>
+                                No fire extinguisher records match your filter criteria.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedReport.map((pos, idx) => {
+                              const globalIdx = (reportPage - 1) * reportPageSize + idx + 1;
+                              const isOK = pos.inspectionStatus === 'Inspected - OK';
+                              const isAtt = pos.inspectionStatus === 'Inspected - Attention';
+                              const loc = [pos.area, pos.locationDescription || pos.location].filter(Boolean).join(' — ') || 'Plant Floor';
+
+                              return (
+                                <tr
+                                  key={pos.positionId || pos.id}
+                                  style={{ borderBottom: `1px solid ${DS.border}` }}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#F8FAFC'}
+                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                                >
+                                  <td style={{ padding: '10px', textAlign: 'center', color: '#94A3B8', fontWeight: 600 }}>
+                                    {globalIdx}
+                                  </td>
+                                  <td style={{ padding: '10px', fontWeight: 600, color: DS.textPrimary, whiteSpace: 'nowrap' }}>
+                                    {pos.positionId || pos.id}
+                                  </td>
+                                  <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontFamily: 'monospace',
+                                      fontSize: '10.5px',
+                                      backgroundColor: '#F1F5F9',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      color: '#334155'
+                                    }}>
+                                      <QrCode size={10} color="#64748B" />
+                                      {pos.qrCode || pos.qrToken || '—'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '10px', fontWeight: 500, color: DS.textPrimary }}>
+                                    {pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher'}
+                                  </td>
+                                  <td style={{ padding: '10px', textAlign: 'center', fontWeight: 600, color: '#0B6B63', whiteSpace: 'nowrap' }}>
+                                    {pos.currentEquipment?.capacity || '—'}
+                                  </td>
+                                  <td style={{ padding: '10px', color: DS.textSec, whiteSpace: 'nowrap' }}>
+                                    {pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard'}
+                                  </td>
+                                  <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '10.5px', color: '#475569', whiteSpace: 'nowrap' }}>
+                                    {pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—'}
+                                  </td>
+                                  <td style={{ padding: '10px', color: DS.textSec, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={loc}>
+                                    {loc}
+                                  </td>
+                                  <td style={{ padding: '10px', textAlign: 'center', color: DS.textMuted, fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    {pos.lastInspectionDate || pos.inspectionHistory?.[0]?.inspectionDate || '—'}
+                                  </td>
+                                  <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#D97706', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                    {pos.currentEquipment?.nextServiceDueDate || pos.currentEquipment?.nextHydroTestDue || pos.nextInspectionDueDate || '—'}
+                                  </td>
+                                  <td style={{ padding: '10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      padding: '2px 7px',
+                                      borderRadius: '100px',
+                                      backgroundColor: isOK ? '#ECFDF5' : isAtt ? '#FEF2F2' : '#F1F5F9',
+                                      color: isOK ? '#059669' : isAtt ? '#DC2626' : '#64748B',
+                                      border: `1px solid ${isOK ? '#A7F3D0' : isAtt ? '#FECACA' : '#E2E8F0'}`
+                                    }}>
+                                      <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: isOK ? '#059669' : isAtt ? '#DC2626' : '#94A3B8' }} />
+                                      {isOK ? 'Verified OK' : isAtt ? 'Needs Attn' : 'Pending'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '10px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                    <div style={{ display: 'inline-flex', gap: '4px' }}>
+                                      <button
+                                        onClick={() => {
+                                          setExtinguisherView(null);
+                                          if (onSelectPosition) onSelectPosition(pos);
+                                          onNavigate('asset-details');
+                                        }}
+                                        style={{
+                                          height: '24px',
+                                          padding: '0 7px',
+                                          borderRadius: '4px',
+                                          backgroundColor: '#FFF',
+                                          border: `1px solid ${DS.border}`,
+                                          color: DS.textSec,
+                                          fontSize: '10.5px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px'
+                                        }}
+                                        title="View Asset Dossier"
+                                      >
+                                        <Eye size={10} /> Dossier
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setExtinguisherView(null);
+                                          const site = sites.find(s => s.id === pos.siteId) || sites[0];
+                                          if (onSelectSite) onSelectSite(site);
+                                          if (onSelectPosition) onSelectPosition(pos);
+                                          onNavigate('digital-checklist');
+                                        }}
+                                        style={{
+                                          height: '24px',
+                                          padding: '0 8px',
+                                          borderRadius: '4px',
+                                          background: 'linear-gradient(135deg,#0B6B63,#0F766E)',
+                                          color: '#FFF',
+                                          fontSize: '10.5px',
+                                          fontWeight: 600,
+                                          border: 'none',
+                                          cursor: 'pointer'
+                                        }}
+                                        title="Inspect Asset"
+                                      >
+                                        Inspect
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Report Pagination Footer */}
+                    <div style={{
+                      padding: '10px 20px',
+                      borderTop: `1px solid ${DS.border}`,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: '#F8FAFC'
+                    }}>
+                      <div style={{ fontSize: '11.5px', color: DS.textMuted }}>
+                        Showing {paginatedReport.length} of {filteredReport.length} extinguishers ({clientExtinguishers.length} total registered for {client.clientName})
+                      </div>
+                      {reportTotalPages > 1 && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            disabled={reportPage <= 1}
+                            onClick={() => setReportPage(p => Math.max(1, p - 1))}
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: '5px',
+                              border: `1px solid ${DS.border}`,
+                              backgroundColor: '#FFF',
+                              fontSize: '11px',
+                              cursor: reportPage <= 1 ? 'not-allowed' : 'pointer',
+                              opacity: reportPage <= 1 ? 0.5 : 1
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <span style={{ fontSize: '11px', alignSelf: 'center', color: DS.textSec }}>
+                            Page {reportPage} of {reportTotalPages}
+                          </span>
+                          <button
+                            disabled={reportPage >= reportTotalPages}
+                            onClick={() => setReportPage(p => Math.min(reportTotalPages, p + 1))}
+                            style={{
+                              padding: '3px 9px',
+                              borderRadius: '5px',
+                              border: `1px solid ${DS.border}`,
+                              backgroundColor: '#FFF',
+                              fontSize: '11px',
+                              cursor: reportPage >= reportTotalPages ? 'not-allowed' : 'pointer',
+                              opacity: reportPage >= reportTotalPages ? 0.5 : 1
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );

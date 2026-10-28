@@ -433,6 +433,139 @@ export function saveVisits(visits) {
 }
 
 // ============================================================================
+// FIRE EXTINGUISHER INVENTORY & CLIENT BREAKDOWN QUERY HELPERS
+// ============================================================================
+
+/**
+ * Validates whether an asset record is an actual registered fire extinguisher.
+ * Strictly excludes:
+ * - Unassigned QR records (not yet assigned to an asset)
+ * - Delivery Hose Boxes (CL-03), Hydrants, Pumps, SCBA, Sprinklers, Alarms
+ * - Retired or Scrapped units
+ */
+export function isFireExtinguisherAsset(pos) {
+  if (!pos) return false;
+  // Exclude deleted or retired positions
+  if (pos.status === 'Retired' || pos.status === 'Deleted' || pos.operationalStatus === 'Retired' || pos.operationalStatus === 'Scrapped') {
+    return false;
+  }
+  // Must have a valid position or asset identifier
+  if (!pos.positionId && !pos.id) return false;
+
+  const eqCategory = (pos.equipmentCategory || '').trim().toLowerCase();
+  const eqType = (pos.equipmentType || '').trim().toLowerCase();
+  const tmpl = (pos.templateId || '').trim().toUpperCase();
+  const unitType = (pos.currentEquipment?.type || '').trim().toLowerCase();
+
+  // Explicit non-extinguisher asset types to strictly exclude
+  const excludedKeywords = [
+    'hose', 'hydrant', 'pump', 'sprinkler', 'alarm', 'detector',
+    'panel', 'damper', 'monitor', 'breathing', 'scba', 'door', 'blanket', 'signage'
+  ];
+  const hasExcludedKeyword = excludedKeywords.some(kw => 
+    eqType.includes(kw) || eqCategory.includes(kw) || unitType.includes(kw)
+  );
+  if (hasExcludedKeyword) return false;
+
+  // Extinguisher indicators
+  if (eqCategory === 'fire extinguisher' || eqCategory === 'extinguisher') return true;
+  if (eqType === 'fire extinguisher' || eqType.includes('extinguisher')) return true;
+  if (tmpl === 'CL-11') return true;
+  if (
+    unitType.includes('extinguisher') ||
+    unitType.includes('dcp') ||
+    unitType.includes('co2') ||
+    unitType.includes('afff') ||
+    unitType.includes('stored pressure') ||
+    unitType.includes('water co2') ||
+    unitType.includes('clean agent')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Returns all registered fire extinguisher positions across all clients (or filtered by site/client)
+ */
+export function getRegisteredExtinguishers(clientIdOrSiteId = null) {
+  const positions = getPositions();
+  const sites = getSites();
+
+  let filtered = positions.filter(isFireExtinguisherAsset);
+
+  if (clientIdOrSiteId) {
+    filtered = filtered.filter(p => {
+      if (p.siteId === clientIdOrSiteId) return true;
+      const s = sites.find(site => site.id === p.siteId || site.code === p.siteId);
+      const cName = s?.clientName || s?.company || s?.name || p.clientName;
+      return cName === clientIdOrSiteId || s?.id === clientIdOrSiteId;
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Returns total count of registered fire extinguishers across all clients
+ */
+export function getTotalExtinguishersCount() {
+  return getRegisteredExtinguishers().length;
+}
+
+/**
+ * Returns client-wise aggregated breakdown of fire extinguishers:
+ * [ { clientName, siteId, siteName, totalExtinguishers, extinguishers, typesBreakdown, inspectedCount, attentionCount, pendingCount } ]
+ */
+export function getClientExtinguisherBreakdown() {
+  const extinguishers = getRegisteredExtinguishers();
+  const sites = getSites();
+
+  const clientMap = {};
+
+  extinguishers.forEach(ext => {
+    const s = sites.find(site => site.id === ext.siteId || site.code === ext.siteId);
+    const clientKey = s?.clientName || s?.company || s?.name || ext.clientName || 'Unassigned Client';
+    const siteTitle = s?.plantFacility || s?.name || ext.siteName || ext.siteId || 'Main Facility';
+    
+    if (!clientMap[clientKey]) {
+      clientMap[clientKey] = {
+        clientName: clientKey,
+        siteId: ext.siteId,
+        siteName: siteTitle,
+        siteAddress: s?.address || ext.siteAddress || '',
+        city: s?.city || ext.city || '',
+        totalExtinguishers: 0,
+        extinguishers: [],
+        typesBreakdown: {},
+        inspectedCount: 0,
+        attentionCount: 0,
+        pendingCount: 0
+      };
+    }
+
+    clientMap[clientKey].totalExtinguishers++;
+    clientMap[clientKey].extinguishers.push(ext);
+
+    // Track type breakdown
+    const typeLabel = ext.currentEquipment?.type || ext.equipmentType || 'Fire Extinguisher';
+    clientMap[clientKey].typesBreakdown[typeLabel] = (clientMap[clientKey].typesBreakdown[typeLabel] || 0) + 1;
+
+    // Track inspection status
+    if (ext.inspectionStatus === 'Inspected - OK') {
+      clientMap[clientKey].inspectedCount++;
+    } else if (ext.inspectionStatus === 'Inspected - Attention') {
+      clientMap[clientKey].attentionCount++;
+    } else {
+      clientMap[clientKey].pendingCount++;
+    }
+  });
+
+  return Object.values(clientMap).sort((a, b) => b.totalExtinguishers - a.totalExtinguishers);
+}
+
+// ============================================================================
 // PERMANENT QR REGISTRY & BULK GENERATION MODULE (Modules 1, 2, 3)
 // Concurrency-safe, duplicate-free, permanent registry of all QR tokens
 // ============================================================================
