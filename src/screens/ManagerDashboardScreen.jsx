@@ -4,7 +4,7 @@ import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
   Building2, ShieldCheck, AlertTriangle, Calendar, CheckCircle2, 
-  TrendingUp, TrendingDown, FileCheck, ArrowRight, BarChart3,
+  TrendingUp, TrendingDown, FileCheck, ArrowRight, ArrowUpRight, BarChart3,
   ExternalLink, Search, Download, PlusCircle, QrCode, Flame,
   Clock, ChevronRight, Sparkles, FileSpreadsheet, Database,
   Activity, Zap, Target, AlertCircle, Check, Eye, X, Filter
@@ -745,125 +745,357 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         ))}
       </div>
 
-      {/* ═══ 4. TWO-COLUMN MIDDLE BLOCK ══════════════════════════════ */}
+      {/* ═══ 4. TWO-COLUMN MIDDLE BLOCK (Requested MNC Card Style) ══════ */}
       <div className="dash-row" style={{
-        display:'grid', gridTemplateColumns:'1.15fr 1fr', gap:'13px'
+        display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:'14px'
       }}>
 
-        {/* Left – Scheduled Work Orders */}
-        <Card>
-          <SectionHead
-            icon={Calendar}
-            title="Scheduled Plant AMC Work Orders"
-            sub="Active inspection work orders across all contracted sites"
-            right={
-              <span style={{ fontSize:'10.5px', fontWeight:700, padding:'3px 10px', borderRadius:'100px', backgroundColor:'#EEF2FF', color:'#4338CA', border:'1px solid #C7D2FE' }}>
-                {sites.length} plants
+        {/* Left – Scheduled Plant AMC Work Orders */}
+        <section
+          id="scheduled-orders-component"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            borderRadius: '12px',
+            backgroundColor: '#F4F5F5',
+            padding: '16px 20px',
+            minHeight: '300px',
+            boxSizing: 'border-box'
+          }}
+          className="flex flex-col overflow-hidden rounded-xl bg-[#F4F5F5] dark:bg-[#1A1A1A] p-4 sm:p-5 min-h-[300px]"
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center', justifyContent: 'space-between', gap: '12px', pb: '4px' }}>
+            <div style={{ display: 'flex', minWidth: 0, alignItems: 'baseline', gap: '8px' }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#363D42',
+                fontFamily: "'Poppins', 'Inter', -apple-system, sans-serif",
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                Scheduled Work Orders
+              </h3>
+              <span style={{
+                fontSize: '12px',
+                color: '#9CA3AF',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {sites.filter(s => s.status !== 'Completed').length} active · {pendingPositions} pending
               </span>
-            }
-          />
-          <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-            {sites.map(site => {
-              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
-              const done = pct === 100;
-              return (
-                <div key={site.id} style={{
-                  padding:'12px 14px', borderRadius:'10px',
-                  border:`1px solid ${DS.border}`,
-                  background: done ? 'linear-gradient(135deg,#F0FDF4,#ECFDF5)' : '#FAFBFF',
-                  display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px'
-                }}>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'7px', marginBottom:'3px' }}>
-                      <span style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary }}>{site.name}</span>
-                      <span style={{
-                        fontSize:'10px', fontWeight:700, padding:'1.5px 7px', borderRadius:'100px',
-                        backgroundColor:done?'#D1FAE5':'#FEF3C7', color:done?'#059669':'#D97706'
-                      }}>
-                        {done ? '✓ Complete' : site.status}
-                      </span>
-                    </div>
-                    <p style={{ fontSize:'11px', color:DS.textMuted, margin:'0 0 8px 0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {site.city} · PO {site.poNumber} · {site.amcType||'Quarterly'} · Exp {site.amcExpiryDate||'—'}
-                    </p>
-                    <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                      <div style={{ flex:1, height:'5px', borderRadius:'100px', backgroundColor:'#E2E8F0', overflow:'hidden' }}>
-                        <div style={{
-                          height:'100%', borderRadius:'100px', width:`${pct}%`,
-                          background: done ? 'linear-gradient(90deg,#059669,#34D399)' : 'linear-gradient(90deg,#2563EB,#60A5FA)',
-                          transition:'width 0.9s cubic-bezier(.4,0,.2,1)'
-                        }}/>
-                      </div>
-                      <span style={{ fontSize:'10.5px', fontWeight:700, color:done?DS.emerald:DS.sapphire, minWidth:'28px', textAlign:'right' }}>
-                        {pct}%
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { if(onSelectSite) onSelectSite(site); onNavigate('qr-scanner'); }}
-                    style={{
-                      height:'30px', padding:'0 12px', borderRadius:'7px', flexShrink:0,
-                      display:'flex', alignItems:'center', gap:'4px',
-                      background:'linear-gradient(135deg,#1E3A8A,#2563EB)',
-                      color:'#FFF', fontSize:'11.5px', fontWeight:700,
-                      border:'none', cursor:'pointer',
-                      boxShadow:'0 2px 6px rgba(37,99,235,.35)',
-                      transition:'all 0.18s ease'
-                    }}>
-                    Inspect <ChevronRight size={11}/>
-                  </button>
-                </div>
-              );
-            })}
+            </div>
+            <button
+              onClick={() => setModalCategory('SLA')}
+              style={{
+                display: 'inline-flex',
+                flexShrink: 0,
+                alignItems: 'center',
+                gap: '2px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#0B6B63',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                transition: 'color 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#095950'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#0B6B63'; }}
+            >
+              View all
+              <ArrowUpRight size={14} style={{ display: 'inline-block' }} />
+            </button>
           </div>
-        </Card>
 
-        {/* Right – Live Activity Feed */}
-        <Card>
-          <SectionHead
-            icon={Activity}
-            iconBg="linear-gradient(135deg,#059669,#10B981)"
-            title="Live Field Activity Stream"
-            sub="Real-time inspection dispatch feed"
-            right={
-              <span style={{ display:'flex', alignItems:'center', gap:'5px', fontSize:'11px', fontWeight:600, color:DS.emerald }}>
-                <LiveDot color={DS.emerald}/> Live
-              </span>
-            }
-          />
-          <div style={{ display:'flex', flexDirection:'column' }}>
-            {[
-              { color:DS.emerald, icon:Check,       title:'POS-AIL-001 Cylinder Replaced',      desc:'Permanent QR QR-POS-AIL-001 retained. Replacement IFS-2023-ABC-9901 linked.', time:'15 min ago · Ramesh Patel' },
-              { color:DS.sapphire,icon:ShieldCheck, title:'CL-11 Hydro Test Passed (35 Bar)',    desc:'POS-AIL-002 tested 3 mins. Zero pressure drop or body distortion observed.',  time:'45 min ago · SOP/011 compliant' },
-              { color:DS.amber,   icon:AlertCircle, title:'Defect Flagged: Hose Box Gland',      desc:'POS-ATL-003 minor leak identified. Photo evidence recorded; spare requisitioned.', time:'1 hr ago · Atul Ltd Site' },
-              { color:DS.emerald, icon:FileCheck,   title:'Client Sign-Off Completed',            desc:'Dual technician & plant safety officer digital signature recorded.',          time:'2 hr ago · Rajesh Mehta' },
-              { color:DS.violet,  icon:QrCode,      title:'Bulk QR Labels Generated',             desc:'50 permanent QR anchors generated for Deepak Nitrite Unit. Registry updated.', time:'3 hr ago · System' },
-            ].map((ev, i, arr) => {
-              const Icon = ev.icon;
+          {/* List items with divide-y divide-white */}
+          <ul style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: '8px 0 0 0',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1
+          }}>
+            {sites.map((site, i) => {
+              const pct = site.totalPositions > 0 ? Math.round(((site.inspectedPositions || 0) / site.totalPositions) * 100) : 0;
+              const isDone = pct === 100;
+              const isMiddle = pct > 0 && !isDone;
+
               return (
-                <div key={i} style={{
-                  display:'flex', gap:'11px',
-                  paddingBottom: i < arr.length-1 ? '13px' : 0,
-                  marginBottom:  i < arr.length-1 ? '13px' : 0,
-                  borderBottom:  i < arr.length-1 ? `1px dashed ${DS.border}` : 'none'
-                }}>
-                  <div style={{
-                    width:'30px', height:'30px', borderRadius:'8px', flexShrink:0,
-                    backgroundColor:`${ev.color}18`, border:`1px solid ${ev.color}30`,
-                    display:'flex', alignItems:'center', justifyContent:'center'
-                  }}>
-                    <Icon size={14} color={ev.color}/>
+                <li
+                  key={site.id}
+                  style={{
+                    borderBottom: i < sites.length - 1 ? '1px solid #FFFFFF' : 'none'
+                  }}
+                >
+                  <div
+                    onClick={() => {
+                      if (onSelectSite) onSelectSite(site);
+                      onNavigate('qr-scanner');
+                    }}
+                    style={{
+                      margin: '0 -8px',
+                      display: 'flex',
+                      height: '56px',
+                      alignItems: 'center',
+                      gap: '12px',
+                      borderRadius: '6px',
+                      padding: '0 8px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{
+                        margin: 0,
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: '#363D42',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {site.name} {site.code ? `(${site.code})` : ''}
+                      </p>
+                      <p style={{
+                        margin: '2px 0 0 0',
+                        fontSize: '11px',
+                        color: '#9CA3AF',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        PO {site.poNumber || '—'} · {site.amcType || 'Quarterly'} · Exp {site.amcExpiryDate || '—'}
+                      </p>
+                    </div>
+
+                    <div style={{
+                      flexShrink: 0,
+                      textAlign: 'right',
+                      fontSize: '12px',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      <p style={{
+                        margin: 0,
+                        fontWeight: 500,
+                        color: isDone ? '#059669' : isMiddle ? '#0B6B63' : '#D97706'
+                      }}>
+                        {isDone ? '✓ 100% Complete' : `${pct}% (${site.inspectedPositions}/${site.totalPositions})`}
+                      </p>
+                      <p style={{
+                        margin: '2px 0 0 0',
+                        fontSize: '11px',
+                        color: '#9CA3AF'
+                      }}>
+                        {site.city}
+                      </p>
+                    </div>
                   </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary, marginBottom:'2px' }}>{ev.title}</div>
-                    <div style={{ fontSize:'11.5px', color:DS.textSec, lineHeight:1.5, marginBottom:'3px' }}>{ev.desc}</div>
-                    <div style={{ fontSize:'10.5px', color:DS.textMuted }}>{ev.time}</div>
-                  </div>
-                </div>
+                </li>
               );
             })}
+          </ul>
+        </section>
+
+        {/* Right – Live Field Activity Stream */}
+        <section
+          id="live-activity-component"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            borderRadius: '12px',
+            backgroundColor: '#F4F5F5',
+            padding: '16px 20px',
+            minHeight: '300px',
+            boxSizing: 'border-box'
+          }}
+          className="flex flex-col overflow-hidden rounded-xl bg-[#F4F5F5] dark:bg-[#1A1A1A] p-4 sm:p-5 min-h-[300px]"
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center', justifyContent: 'space-between', gap: '12px', pb: '4px' }}>
+            <div style={{ display: 'flex', minWidth: 0, alignItems: 'baseline', gap: '8px' }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#363D42',
+                fontFamily: "'Poppins', 'Inter', -apple-system, sans-serif",
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                Live Field Activity
+              </h3>
+              <span style={{
+                fontSize: '12px',
+                color: '#059669',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                <LiveDot color="#059669" /> Live stream
+              </span>
+            </div>
+            <button
+              onClick={() => setModalCategory('COVERAGE')}
+              style={{
+                display: 'inline-flex',
+                flexShrink: 0,
+                alignItems: 'center',
+                gap: '2px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#0B6B63',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                transition: 'color 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#095950'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#0B6B63'; }}
+            >
+              View all
+              <ArrowUpRight size={14} style={{ display: 'inline-block' }} />
+            </button>
           </div>
-        </Card>
+
+          {/* List items with divide-y divide-white */}
+          <ul style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: '8px 0 0 0',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1
+          }}>
+            {[
+              {
+                title: 'POS-AIL-001 Cylinder Replaced',
+                desc: 'Permanent QR retained · Replacement IFS-2023-ABC-9901 linked',
+                metric: 'Verified OK',
+                subText: '15m ago',
+                color: '#059669',
+                category: 'CL-11'
+              },
+              {
+                title: 'CL-11 Hydro Test Passed (35 Bar)',
+                desc: 'POS-AIL-002 tested 3 mins · Zero pressure drop observed',
+                metric: '35 Bar Proof',
+                subText: '45m ago',
+                color: '#059669',
+                category: 'CL-11'
+              },
+              {
+                title: 'Defect Flagged: Hose Box Gland',
+                desc: 'POS-ATL-003 minor gland leak · Spare washer requisitioned',
+                metric: 'Attention',
+                subText: '1h ago',
+                color: '#DC2626',
+                category: 'DEFECTS'
+              },
+              {
+                title: 'Client Sign-Off Completed',
+                desc: 'Plant safety officer & lead engineer digital sign recorded',
+                metric: 'Signed OK',
+                subText: '2h ago',
+                color: '#0B6B63',
+                category: 'SLA'
+              },
+              {
+                title: 'Bulk QR Anchors Generated',
+                desc: '50 permanent QR tokens generated for Deepak Nitrite Unit',
+                metric: '50 Anchors',
+                subText: '3h ago',
+                color: '#7C3AED',
+                category: 'QR'
+              }
+            ].map((ev, i, arr) => (
+              <li
+                key={i}
+                style={{
+                  borderBottom: i < arr.length - 1 ? '1px solid #FFFFFF' : 'none'
+                }}
+              >
+                <div
+                  onClick={() => setModalCategory(ev.category)}
+                  style={{
+                    margin: '0 -8px',
+                    display: 'flex',
+                    height: '56px',
+                    alignItems: 'center',
+                    gap: '12px',
+                    borderRadius: '6px',
+                    padding: '0 8px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      color: '#363D42',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {ev.title}
+                    </p>
+                    <p style={{
+                      margin: '2px 0 0 0',
+                      fontSize: '11px',
+                      color: '#9CA3AF',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {ev.desc}
+                    </p>
+                  </div>
+
+                  <div style={{
+                    flexShrink: 0,
+                    textAlign: 'right',
+                    fontSize: '12px',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    <p style={{
+                      margin: 0,
+                      fontWeight: 500,
+                      color: ev.color
+                    }}>
+                      {ev.metric}
+                    </p>
+                    <p style={{
+                      margin: '2px 0 0 0',
+                      fontSize: '11px',
+                      color: '#9CA3AF'
+                    }}>
+                      {ev.subText}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
 
       {/* ═══ 5. SITE COVERAGE ANALYTICS GRID ════════════════════════ */}
