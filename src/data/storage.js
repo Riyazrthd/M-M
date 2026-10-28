@@ -19,50 +19,105 @@ export const STORAGE_KEYS = {
   QR_SEQUENCE: 'ifspl_amc_qr_sequence'
 };
 
-// Initialize default storage if empty
-export function initStorage() {
+/**
+ * Clear all demo/sample client data for production launch
+ * Strictly preserves all 26 Checklists, SOPs, Equipment Masters, Template Mappings, and Technicians
+ */
+export function clearAllClientData() {
+  localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([]));
+  localStorage.removeItem(STORAGE_KEYS.ACTIVE_VISIT_ID);
+  
+  // Clean QR registry: unassign any linked positions so all labels are Available
+  try {
+    const rawQr = localStorage.getItem(STORAGE_KEYS.QR_REGISTRY);
+    if (rawQr) {
+      const qrList = JSON.parse(rawQr);
+      const cleaned = qrList
+        .filter(item => item.batchId !== 'BATCH-INITIAL-ASSIGNED')
+        .map(item => {
+          if (item.assignmentStatus === 'Assigned') {
+            return {
+              ...item,
+              assignmentStatus: 'Available',
+              linkedAssetId: null,
+              linkedPositionId: null,
+              linkedAssetName: null,
+              assignedDate: null,
+              assignedBy: null
+            };
+          }
+          return item;
+        });
+      localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(cleaned));
+    }
+  } catch (e) {}
+
+  localStorage.setItem('ifspl_production_clean_v1', 'true');
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('storage'));
+      window.dispatchEvent(new CustomEvent('ifspl:data_cleared'));
+    } catch (e) {}
+  }
+}
+
+/**
+ * Seed demo client data for evaluation or testing
+ */
+export function seedDemoClientData() {
+  localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(DEMO_SITES));
+  localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(DEMO_POSITIONS));
+  localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([DEMO_ACTIVE_VISIT]));
+  localStorage.setItem('ifspl_production_clean_v1', 'demo');
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('storage'));
+      window.dispatchEvent(new CustomEvent('ifspl:data_cleared'));
+    } catch (e) {}
+  }
+}
+
+// Initialize default storage
+export function initStorage(forceDemo = false) {
+  const isTestEnv = forceDemo || (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test');
+
   if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEMO_USERS[0]));
   }
-  if (!localStorage.getItem(STORAGE_KEYS.SITES)) {
-    localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(DEMO_SITES));
+
+  // Production migration check: if in browser and clean flag not yet set, clear all demo clients
+  const isProductionClean = localStorage.getItem('ifspl_production_clean_v1');
+
+  if (isTestEnv) {
+    if (!localStorage.getItem(STORAGE_KEYS.SITES)) {
+      localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(DEMO_SITES));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.POSITIONS)) {
+      localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(DEMO_POSITIONS));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.VISITS)) {
+      localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([DEMO_ACTIVE_VISIT]));
+    }
   } else {
-    // Sync client fields if missing from previous session
-    try {
-      const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.SITES));
-      let modified = false;
-      const updated = existing.map(site => {
-        const demo = DEMO_SITES.find(d => d.id === site.id);
-        if (demo && (!site.clientName || !site.email || !site.contactPhone || !site.poDate || !site.amcType || !site.noOfVisits || !site.amcExpiryDate)) {
-          modified = true;
-          return {
-            ...site,
-            clientName: site.clientName || demo.clientName,
-            name: site.name || demo.name,
-            contactPhone: site.contactPhone || demo.contactPhone,
-            email: site.email || demo.email,
-            taxId: site.taxId || demo.taxId,
-            poNumber: site.poNumber || demo.poNumber,
-            poDate: site.poDate || demo.poDate,
-            amcType: site.amcType || demo.amcType || site.frequency || demo.frequency,
-            frequency: site.frequency || demo.frequency || site.amcType || demo.amcType,
-            noOfVisits: site.noOfVisits !== undefined ? site.noOfVisits : demo.noOfVisits,
-            amcExpiryDate: site.amcExpiryDate || demo.amcExpiryDate
-          };
-        }
-        return site;
-      });
-      if (modified) {
-        localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(updated));
+    // Production browser runtime:
+    if (!isProductionClean) {
+      // First load in production: clean demo client records
+      clearAllClientData();
+    } else {
+      if (!localStorage.getItem(STORAGE_KEYS.SITES)) {
+        localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify([]));
       }
-    } catch (e) {}
+      if (!localStorage.getItem(STORAGE_KEYS.POSITIONS)) {
+        localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.VISITS)) {
+        localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([]));
+      }
+    }
   }
-  if (!localStorage.getItem(STORAGE_KEYS.POSITIONS)) {
-    localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(DEMO_POSITIONS));
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.VISITS)) {
-    localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([DEMO_ACTIVE_VISIT]));
-  }
+
   if (!localStorage.getItem(STORAGE_KEYS.SYNC_QUEUE)) {
     localStorage.setItem(STORAGE_KEYS.SYNC_QUEUE, JSON.stringify([]));
   }
@@ -78,9 +133,9 @@ export function initStorage() {
   if (!localStorage.getItem(STORAGE_KEYS.QR_REGISTRY)) {
     // Populate permanent QR registry with initial seed data:
     // 1. Initial pre-printed Available labels batch (SR. NO. 001 to SR. NO. 050)
-    // 2. Already assigned assets from DEMO_POSITIONS
+    // 2. Already assigned assets only if in test environment
     const initialRegistry = [];
-    const positions = JSON.parse(localStorage.getItem(STORAGE_KEYS.POSITIONS) || '[]') || DEMO_POSITIONS;
+    const positions = (isTestEnv && DEMO_POSITIONS) || [];
 
     // Seed initial batch of 50 available QR labels
     for (let s = 1; s <= 50; s++) {
@@ -106,34 +161,35 @@ export function initStorage() {
       });
     }
 
-    // Register existing demo positions as Assigned
-    positions.forEach((pos, idx) => {
-      const seq = 100 + idx + 1;
-      const padded = String(seq).padStart(6, '0');
-      const token = pos.qrCode || `IFS-QR-${pos.positionId}`;
-      initialRegistry.push({
-        id: `QR-REC-${padded}`,
-        token: token,
-        displayNo: `SR. NO. ${String(seq).padStart(3, '0')}`,
-        seqNumber: seq,
-        batchId: 'BATCH-INITIAL-ASSIGNED',
-        batchLabel: 'Initial Site Assets Batch',
-        generatedDate: '01/10/2026',
-        generatedTime: '09:00:00 AM',
-        generatedAt: '2026-10-01T03:30:00.000Z',
-        generatedBy: 'System Auto-Register',
-        assignmentStatus: 'Assigned',
-        linkedAssetId: pos.positionId,
-        linkedPositionId: pos.positionId,
-        linkedAssetName: pos.equipmentType || 'Fire Safety Equipment',
-        assignedDate: '01/10/2026 09:30 AM',
-        assignedBy: 'System Auto-Register',
-        lifecycleStatus: 'Active'
+    if (isTestEnv && positions.length > 0) {
+      positions.forEach((pos, idx) => {
+        const seq = 100 + idx + 1;
+        const padded = String(seq).padStart(6, '0');
+        const token = pos.qrCode || `IFS-QR-${pos.positionId}`;
+        initialRegistry.push({
+          id: `QR-REC-${padded}`,
+          token: token,
+          displayNo: `SR. NO. ${String(seq).padStart(3, '0')}`,
+          seqNumber: seq,
+          batchId: 'BATCH-INITIAL-ASSIGNED',
+          batchLabel: 'Initial Site Assets Batch',
+          generatedDate: '01/10/2026',
+          generatedTime: '09:00:00 AM',
+          generatedAt: '2026-10-01T03:30:00.000Z',
+          generatedBy: 'System Auto-Register',
+          assignmentStatus: 'Assigned',
+          linkedAssetId: pos.positionId,
+          linkedPositionId: pos.positionId,
+          linkedAssetName: pos.equipmentType || 'Fire Safety Equipment',
+          assignedDate: '01/10/2026 09:30 AM',
+          assignedBy: 'System Auto-Register',
+          lifecycleStatus: 'Active'
+        });
       });
-    });
+    }
 
     localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(initialRegistry));
-    const highestSeq = Math.max(...initialRegistry.map(r => r.seqNumber || 0), 120);
+    const highestSeq = Math.max(...initialRegistry.map(r => r.seqNumber || 0), 50);
     localStorage.setItem(STORAGE_KEYS.QR_SEQUENCE, String(highestSeq));
   }
 }
@@ -210,7 +266,9 @@ export function setCurrentUser(user) {
 export function getSites() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SITES);
-    const sites = data ? JSON.parse(data) : DEMO_SITES;
+    if (!data) return [];
+    const sites = JSON.parse(data);
+    if (!Array.isArray(sites)) return [];
     const allPositions = getPositions();
 
     // Dynamically calculate coverage from actual equipment position records
@@ -233,7 +291,7 @@ export function getSites() {
       return site;
     });
   } catch (e) {
-    return DEMO_SITES;
+    return [];
   }
 }
 
@@ -244,7 +302,7 @@ export function getSiteById(siteId) {
 
 export function addSite(siteData) {
   const data = localStorage.getItem(STORAGE_KEYS.SITES);
-  const sites = data ? JSON.parse(data) : DEMO_SITES;
+  const sites = data ? JSON.parse(data) : [];
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
   const nextYear = new Date(today);
@@ -292,7 +350,7 @@ export function addSite(siteData) {
 
 export function updateSite(siteId, updatedData) {
   const data = localStorage.getItem(STORAGE_KEYS.SITES);
-  const sites = data ? JSON.parse(data) : DEMO_SITES;
+  const sites = data ? JSON.parse(data) : [];
   const index = sites.findIndex(s => s.id === siteId);
   if (index === -1) return null;
 
@@ -317,7 +375,7 @@ export function updateSite(siteId, updatedData) {
 
 export function deleteSite(siteId) {
   const data = localStorage.getItem(STORAGE_KEYS.SITES);
-  const sites = data ? JSON.parse(data) : DEMO_SITES;
+  const sites = data ? JSON.parse(data) : [];
   const filtered = sites.filter(s => s.id !== siteId);
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(filtered));
   return true;
@@ -327,13 +385,15 @@ export function deleteSite(siteId) {
 export function getPositions(siteId = null) {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.POSITIONS);
-    const positions = data ? JSON.parse(data) : DEMO_POSITIONS;
+    if (!data) return [];
+    const positions = JSON.parse(data);
+    if (!Array.isArray(positions)) return [];
     if (siteId) {
       return positions.filter(p => p.siteId === siteId);
     }
     return positions;
   } catch (e) {
-    return siteId ? DEMO_POSITIONS.filter(p => p.siteId === siteId) : DEMO_POSITIONS;
+    return [];
   }
 }
 
@@ -778,9 +838,11 @@ export function replaceEquipmentAtPosition(positionId, replacementData) {
 export function getVisits() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.VISITS);
-    return data ? JSON.parse(data) : [DEMO_ACTIVE_VISIT];
+    if (!data) return [];
+    const visits = JSON.parse(data);
+    return Array.isArray(visits) ? visits : [];
   } catch (e) {
-    return [DEMO_ACTIVE_VISIT];
+    return [];
   }
 }
 

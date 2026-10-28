@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, getPositions, addSite, updateSite, deleteSite } from '../data/storage';
+import { getSites, getPositions, addSite, updateSite, deleteSite, clearAllClientData, seedDemoClientData } from '../data/storage';
 import TemplateMappingsModal from '../components/TemplateMappingsModal';
 import EquipmentMasterModal from '../components/EquipmentMasterModal';
 import { 
@@ -45,8 +45,37 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
   const [viewClient, setViewClient] = useState(null);
+
+  // Sync state on storage events
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSites(getSites());
+      setPositions(getPositions());
+    };
+    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('ifspl:data_cleared', handleUpdate);
+    return () => {
+      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('ifspl:data_cleared', handleUpdate);
+    };
+  }, []);
+
+  const handleConfirmClearAll = () => {
+    clearAllClientData();
+    setSites([]);
+    setPositions([]);
+    setSelectedClientIds([]);
+    setIsClearModalOpen(false);
+  };
+
+  const handleSeedDemoData = () => {
+    seedDemoClientData();
+    setSites(getSites());
+    setPositions(getPositions());
+  };
 
   // Helper to generate fresh initial form data with 1-year contract defaults
   const getInitialFormData = () => {
@@ -454,6 +483,31 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
             >
               <Plus size={18} strokeWidth={2.5} />
             </button>
+
+            {/* Clear All Client Data Button (Production Clean Slate) */}
+            {sites.length > 0 && (
+              <button
+                onClick={() => setIsClearModalOpen(true)}
+                style={{
+                  height: '34px',
+                  padding: '0 10px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FEF2F2',
+                  color: '#DC2626',
+                  border: '1px solid #FCA5A5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+                title="Clear All Client Data (Start Fresh for Production)"
+              >
+                <Trash2 size={13} />
+                <span>Clear Clients</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -746,7 +800,84 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
           );
         })}
 
-        {filteredSites.length === 0 && (
+        {sites.length === 0 ? (
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            border: '1px solid #EAECF0',
+            padding: '48px 24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '14px'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              backgroundColor: '#ECFDF5',
+              border: '1px solid #A7F3D0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#059669'
+            }}>
+              <Building2 size={28} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#111827' }}>
+                Production Workspace Ready
+              </h3>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.86rem', color: '#6B7280', maxWidth: '480px' }}>
+                No clients registered yet. All 26 digital checklists (CL-01 to CL-26), SOP standards, equipment master types, and QR code tools are loaded and ready. Register your first industrial facility to start.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '6px' }}>
+              <button
+                onClick={handleOpenAdd}
+                style={{
+                  height: '38px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  backgroundColor: '#064E3B',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={16} /> Register First Client
+              </button>
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                style={{
+                  height: '38px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Upload size={16} /> Import Client CSV
+              </button>
+            </div>
+            <div style={{ marginTop: '12px', fontSize: '0.78rem', color: '#9CA3AF' }}>
+              Need test fixtures? <button onClick={handleSeedDemoData} style={{ background: 'none', border: 'none', color: '#0B6B63', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: '0.78rem' }}>Load demo clients for evaluation</button>
+            </div>
+          </div>
+        ) : filteredSites.length === 0 ? (
           <div style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '12px',
@@ -756,9 +887,9 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
             color: '#6B7280'
           }}>
             <p style={{ fontSize: '0.92rem', marginBottom: '6px' }}>No clients found matching "{searchQuery}"</p>
-            <p style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>Click the green + button above to register a new client.</p>
+            <p style={{ fontSize: '0.78rem', color: '#9CA3AF' }}>Try adjusting your search terms or filter.</p>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Bottom Utility Bar (Allows accessing Template Mappings and Asset Positions) */}
@@ -1692,6 +1823,83 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 style={{ height: '36px', fontSize: '0.82rem' }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Demo Data Confirmation Modal */}
+      {isClearModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.45)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '16px',
+            maxWidth: '440px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                backgroundColor: '#FEE2E2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#DC2626'
+              }}>
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>
+                  Clear All Client Data?
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#6B7280' }}>
+                  Ready for real production launch
+                </p>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.5, margin: '0 0 20px 0' }}>
+              This will remove all demo client facilities, equipment positions, and active visits.
+              <br /><br />
+              <strong style={{ color: '#065F46' }}>✓ Preserved 100%:</strong> All 26 Checklists (CL-01 to CL-26), SOP documents, Equipment Masters, and QR code printing tools will remain intact.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setIsClearModalOpen(false)}
+                className="btn-outline"
+                style={{ height: '36px', fontSize: '0.82rem', padding: '0 14px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmClearAll}
+                style={{
+                  height: '36px',
+                  padding: '0 16px',
+                  borderRadius: '8px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Yes, Start Fresh
               </button>
             </div>
           </div>

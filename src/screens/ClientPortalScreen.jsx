@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { getSiteById, getPositions, getVisits } from '../data/storage';
+import { getSites, getSiteById, getPositions, getVisits } from '../data/storage';
 import { ShieldCheck, Download, CheckCircle2, AlertTriangle, FileText, Calendar, Building, Printer, ExternalLink } from 'lucide-react';
 
 export default function ClientPortalScreen({ onNavigate }) {
   const [selectedFilter, setSelectedFilter] = useState('ALL');
 
-  const clientSite = getSiteById('SITE-AIL-001');
-  const positions = getPositions('SITE-AIL-001');
-  const visits = getVisits().filter(v => v.siteId === 'SITE-AIL-001');
+  const allSites = getSites();
+  const clientSite = allSites[0] || null;
+  const siteId = clientSite?.id;
+  const positions = siteId ? getPositions(siteId) : [];
+  const visits = siteId ? getVisits().filter(v => v.siteId === siteId) : [];
   const activeVisit = visits[0];
 
   const filteredPositions = positions.filter((pos) => {
@@ -19,6 +21,51 @@ export default function ClientPortalScreen({ onNavigate }) {
 
   const verifiedCount = positions.filter(p => p.inspectionStatus && p.inspectionStatus.startsWith('Inspected')).length;
   const compliancePercent = positions.length > 0 ? Math.round((verifiedCount / positions.length) * 100) : 0;
+
+  if (!clientSite) {
+    return (
+      <div className="app-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="card" style={{ padding: '48px 24px', backgroundColor: '#FFFFFF', textAlign: 'center' }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: '#EFF6FF',
+            border: '1px solid #BFDBFE',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#2563EB',
+            margin: '0 auto 16px auto'
+          }}>
+            <Building size={28} />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+            Client Portal Ready for Production
+          </h2>
+          <p style={{ fontSize: '0.86rem', color: '#6B7280', maxWidth: '440px', margin: '8px auto 20px auto' }}>
+            No clients registered yet. Once you register a client facility, client safety representatives can review verified compliance records and download dossiers here.
+          </p>
+          <button
+            onClick={() => onNavigate('site-list')}
+            style={{
+              height: '38px',
+              padding: '0 18px',
+              borderRadius: '8px',
+              backgroundColor: '#064E3B',
+              color: '#FFFFFF',
+              fontWeight: 600,
+              fontSize: '0.84rem',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Go to Client Facilities
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

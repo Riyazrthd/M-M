@@ -243,6 +243,31 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
   const [filterMode, setFilterMode] = useState('both'); // 'both' | 'visits' | 'units'
   const [hoveredIdx, setHoveredIdx] = useState(null);
 
+  if (sites.length === 0) {
+    return (
+      <div style={{
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #ECECEC',
+        borderRadius: '12px',
+        padding: '24px 18px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+        boxSizing: 'border-box',
+        width: '100%',
+        textAlign: 'center'
+      }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
+          <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: '#111827', fontFamily: "'Poppins', 'Inter', sans-serif" }}>
+            AMC Visits & Equipment Punch Analytics
+          </h3>
+        </div>
+        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6B7280' }}>
+          Production workspace active. As you register clients and conduct AMC service visits via QR punch, your monthly visit and equipment throughput analytics will display here.
+        </p>
+      </div>
+    );
+  }
+
   // Real AMC data points for the 4 months (July - October 2026)
   const monthData = [
     {
@@ -1188,52 +1213,66 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             title="Site-by-Site Coverage Analytics"
             sub="Inspection penetration across all contracted industrial plants"
           />
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(195px,1fr))', gap:'11px' }}>
-            {sites.map(site => {
-              const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
-              const col = pct===100 ? DS.emerald : pct>=50 ? DS.sapphire : DS.crimson;
-              return (
-                <div key={site.id} style={{
-                  padding:'15px', borderRadius:'12px',
-                  border:`1px solid ${DS.border}`, backgroundColor:'#FAFBFF',
-                  display:'flex', flexDirection:'column', gap:'10px'
-                }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize:'13px', fontWeight:500, color:DS.textPrimary }}>{site.name}</div>
-                      <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
+          {sites.length === 0 ? (
+            <div style={{
+              padding: '24px',
+              textAlign: 'center',
+              backgroundColor: '#FAFBFF',
+              borderRadius: '12px',
+              border: `1px solid ${DS.border}`,
+              color: DS.textMuted,
+              fontSize: '13px'
+            }}>
+              No client plants registered yet. Register client facilities to begin tracking site-by-site AMC coverage.
+            </div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(195px,1fr))', gap:'11px' }}>
+              {sites.map(site => {
+                const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions/site.totalPositions)*100) : 0;
+                const col = pct===100 ? DS.emerald : pct>=50 ? DS.sapphire : DS.crimson;
+                return (
+                  <div key={site.id} style={{
+                    padding:'15px', borderRadius:'12px',
+                    border:`1px solid ${DS.border}`, backgroundColor:'#FAFBFF',
+                    display:'flex', flexDirection:'column', gap:'10px'
+                  }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                      <div>
+                        <div style={{ fontSize:'13px', fontWeight:500, color:DS.textPrimary }}>{site.name}</div>
+                        <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
+                      </div>
+                      <span style={{ fontSize:'20px', fontWeight:500, color:col, letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
                     </div>
-                    <span style={{ fontSize:'20px', fontWeight:500, color:col, letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-                    <div style={{ position:'relative', flexShrink:0 }}>
-                      <DonutChart percent={pct} color={col} size={52} strokeWidth={6}/>
-                      <div style={{
-                        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:'9px', fontWeight:800, color:col
-                      }}>
-                        {site.inspectedPositions}/{site.totalPositions}
+                    <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                      <div style={{ position:'relative', flexShrink:0 }}>
+                        <DonutChart percent={pct} color={col} size={52} strokeWidth={6}/>
+                        <div style={{
+                          position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+                          fontSize:'9px', fontWeight:800, color:col
+                        }}>
+                          {site.inspectedPositions}/{site.totalPositions}
+                        </div>
+                      </div>
+                      <div style={{ flex:1 }}>
+                        {[
+                          { label:'Inspected', val:site.inspectedPositions,                    color:col      },
+                          { label:'Pending',   val:site.totalPositions-site.inspectedPositions, color:'#E2E8F0' },
+                        ].map((it,j) => (
+                          <div key={j} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:DS.textSec, marginBottom:'3px' }}>
+                            <span style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                              <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:it.color, display:'inline-block' }}/>
+                              {it.label}
+                            </span>
+                            <strong style={{ color:DS.textPrimary }}>{it.val}</strong>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div style={{ flex:1 }}>
-                      {[
-                        { label:'Inspected', val:site.inspectedPositions,                    color:col      },
-                        { label:'Pending',   val:site.totalPositions-site.inspectedPositions, color:'#E2E8F0' },
-                      ].map((it,j) => (
-                        <div key={j} style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', color:DS.textSec, marginBottom:'3px' }}>
-                          <span style={{ display:'flex', alignItems:'center', gap:'4px' }}>
-                            <span style={{ width:'6px', height:'6px', borderRadius:'50%', backgroundColor:it.color, display:'inline-block' }}/>
-                            {it.label}
-                          </span>
-                          <strong style={{ color:DS.textPrimary }}>{it.val}</strong>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       </div>
 
@@ -1411,18 +1450,23 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             flexDirection: 'column',
             flex: 1
           }}>
-            {sites.map((site, i) => {
-              const pct = site.totalPositions > 0 ? Math.round(((site.inspectedPositions || 0) / site.totalPositions) * 100) : 0;
-              const isDone = pct === 100;
-              const isMiddle = pct > 0 && !isDone;
+            {sites.length === 0 ? (
+              <li style={{ padding: '28px 0', textAlign: 'center', color: '#9CA3AF', fontSize: '12px' }}>
+                No client plants registered yet.
+              </li>
+            ) : (
+              sites.map((site, i) => {
+                const pct = site.totalPositions > 0 ? Math.round(((site.inspectedPositions || 0) / site.totalPositions) * 100) : 0;
+                const isDone = pct === 100;
+                const isMiddle = pct > 0 && !isDone;
 
-              return (
-                <li
-                  key={site.id}
-                  style={{
-                    borderBottom: i < sites.length - 1 ? '1px solid #FFFFFF' : 'none'
-                  }}
-                >
+                return (
+                  <li
+                    key={site.id}
+                    style={{
+                      borderBottom: i < sites.length - 1 ? '1px solid #FFFFFF' : 'none'
+                    }}
+                  >
                   <div
                     onClick={() => {
                       if (onSelectSite) onSelectSite(site);
@@ -1490,7 +1534,8 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                   </div>
                 </li>
               );
-            })}
+            })
+          )}
           </ul>
         </section>
 
@@ -1839,7 +1884,11 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             {filteredPositions.length === 0 && (
               <div style={{ textAlign:'center', padding:'40px', color:DS.textMuted }}>
                 <Search size={26} style={{ opacity:.25, marginBottom:'8px' }}/>
-                <p style={{ fontSize:'13px' }}>No positions match your search or filter.</p>
+                <p style={{ fontSize:'13px' }}>
+                  {positions.length === 0
+                    ? "No equipment positions registered yet. Scan an unassigned QR code to register equipment at a facility."
+                    : "No positions match your search or filter."}
+                </p>
               </div>
             )}
           </div>

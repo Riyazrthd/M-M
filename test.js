@@ -1,4 +1,5 @@
 // Node test runner with browser environment mocks
+process.env.NODE_ENV = 'test';
 global.localStorage = {
   store: {},
   getItem(k) { return this.store[k] || null; },
