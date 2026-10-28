@@ -165,7 +165,7 @@ export default function QRManagementScreen({ onNavigate, onRegisterWithQR, onSel
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
       {/* 1. Header Toolbar */}
       <div style={{

@@ -263,7 +263,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       
       {/* Top Header Card matching the user's reference screenshot */}
       <div style={{

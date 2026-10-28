@@ -100,9 +100,9 @@ export default function Sidebar({
       <aside 
         className={`app-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
         style={{
-          width: isCollapsed ? '68px' : '268px',
-          minWidth: isCollapsed ? '68px' : '268px',
-          maxWidth: isCollapsed ? '68px' : '268px',
+          width: isCollapsed ? '68px' : '260px',
+          minWidth: isCollapsed ? '68px' : '260px',
+          maxWidth: isCollapsed ? '68px' : '260px',
           flexShrink: 0,
           backgroundColor: '#F7F8F9',
           borderRight: '1px solid #E1E5E9',
