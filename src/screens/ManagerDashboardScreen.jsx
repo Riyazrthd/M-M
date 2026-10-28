@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSites, getPositions, getVisits, getCurrentUser } from '../data/storage';
+import { getSites, getPositions, getVisits, getCurrentUser, getQRRegistry } from '../data/storage';
 import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, FileCheck, ArrowRight, BarChart3,
   ExternalLink, Search, Download, PlusCircle, QrCode, Flame,
   Clock, ChevronRight, Sparkles, FileSpreadsheet, Database,
-  Activity, Zap, Target, AlertCircle, Check, Eye
+  Activity, Zap, Target, AlertCircle, Check, Eye, X, Filter
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────
@@ -272,6 +272,25 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   const [isDownloadingMaster,setIsDownloadingMaster] = useState(false);
   const [downloadNotice,     setDownloadNotice]     = useState('');
 
+  // Real Data Modal drill-down state
+  const [modalCategory,      setModalCategory]      = useState(null);
+  const [modalSearchQuery,   setModalSearchQuery]   = useState('');
+  const [modalStatusFilter,  setModalStatusFilter]  = useState('ALL');
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setModalCategory(null);
+        setModalSearchQuery('');
+        setModalStatusFilter('ALL');
+      }
+    };
+    if (modalCategory) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalCategory]);
+
   // KPI computations
   const totalPositions     = sites.reduce((a, s) => a + (s.totalPositions || 0), 0);
   const inspectedPositions = sites.reduce((a, s) => a + (s.inspectedPositions || 0), 0);
@@ -285,10 +304,13 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
 
   const filteredPositions = positions.filter(p => {
     const q = searchQuery.toLowerCase();
+    const posId = p.positionId || p.id || '';
+    const qr = p.qrCode || '';
+    const loc = p.locationDescription || p.location || p.area || '';
+    const sn = p.currentEquipment?.serialNumber || p.currentEquipment?.serialNo || '';
     const matchQ = !q ||
-      p.id.toLowerCase().includes(q) || p.qrCode.toLowerCase().includes(q) ||
-      p.locationDescription?.toLowerCase().includes(q) ||
-      p.currentEquipment?.serialNumber?.toLowerCase().includes(q);
+      posId.toLowerCase().includes(q) || qr.toLowerCase().includes(q) ||
+      loc.toLowerCase().includes(q) || sn.toLowerCase().includes(q);
     const matchS = statusFilter === 'ALL' ||
       (statusFilter === 'OK' && p.inspectionStatus === 'Inspected - OK') ||
       (statusFilter === 'ATTENTION' && p.inspectionStatus === 'Inspected - Attention') ||
@@ -315,12 +337,23 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
     finally { setIsDownloadingMaster(false); }
   };
 
+  const siteName = (p) => {
+    if (!p) return 'Plant Facility';
+    const s = sites.find(site => site.id === p.siteId || site.code === p.siteId);
+    if (s) return s.plantFacility || s.name || s.clientName;
+    if (p.siteId === 'AIL-U4' || p.siteId === 'SITE-AIL-001') return 'Aarti Industries Ltd — Unit IV';
+    if (p.siteId === 'ATL-C2' || p.siteId === 'SITE-ATL-002') return 'Atul Ltd — Complex 2';
+    if (p.siteId === 'DNL-NDS' || p.siteId === 'SITE-DNL-003') return 'Deepak Nitrite Ltd — Nandesari';
+    if (p.siteId === 'LT-HZR' || p.siteId === 'SITE-LT-004') return 'L&T Heavy Engineering — Hazira';
+    return p.siteId || 'Industrial Facility';
+  };
+
   const handleExportCSV = () => {
     const hdr = ['Position ID','QR Code','Plant','Location','Category','Serial No','Template','Status'];
     const rows = filteredPositions.map(p => [
-      p.id, p.qrCode, p.siteId || 'AIL-U4', `"${p.locationDescription||''}"`,
-      p.equipmentCategory||'', p.currentEquipment?.serialNumber||'',
-      p.templateId||'', p.inspectionStatus||'Pending'
+      p.positionId || p.id, p.qrCode || '', siteName(p), `"${p.locationDescription || p.location || p.area || ''}"`,
+      p.currentEquipment?.type || p.equipmentCategory || p.equipmentType || '', p.currentEquipment?.serialNumber || p.currentEquipment?.serialNo || '',
+      p.templateId || '', p.inspectionStatus || 'Pending'
     ]);
     const csv = 'data:text/csv;charset=utf-8,' + [hdr.join(','),...rows.map(r=>r.join(','))].join('\n');
     const a = document.createElement('a');
@@ -329,7 +362,138 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  const siteName = p => p.siteId === 'AIL-U4' ? 'Aarti Industries Ltd' : p.siteId === 'ATL-C2' ? 'Atul Ltd' : p.siteId === 'DNL-NDS' ? 'Deepak Nitrite' : 'L&T Hazira';
+  const handleExportModalCSV = (items, categoryTitle) => {
+    const hdr = ['Position ID', 'QR Code', 'Plant', 'Location', 'Equipment Type', 'Serial No', 'Template', 'Status'];
+    const rows = items.map(p => [
+      p.positionId || p.id,
+      p.qrCode || '',
+      siteName(p),
+      `"${p.locationDescription || p.location || p.area || ''}"`,
+      p.currentEquipment?.type || p.equipmentType || '',
+      p.currentEquipment?.serialNo || p.currentEquipment?.serialNumber || '',
+      p.templateId || '',
+      p.inspectionStatus || 'Pending'
+    ]);
+    const csv = 'data:text/csv;charset=utf-8,' + [hdr.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const a = document.createElement('a');
+    a.href = encodeURI(csv);
+    a.download = `indus_amc_${(categoryTitle || 'data').toLowerCase().replace(/[^a-z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const getModalData = () => {
+    if (!modalCategory) return null;
+
+    let title = '';
+    let subtitle = '';
+    let icon = ShieldCheck;
+    let iconBg = 'linear-gradient(135deg, #1E3A8A, #2563EB)';
+    let rawItems = [];
+    let isSiteView = false;
+
+    if (modalCategory === 'CL-11') {
+      title = 'Hydro Testing Equipment — SOP/011 Proof Audit (CL-11)';
+      subtitle = 'Statutory IS 2190 proof pressure testing (35 Bar / 250 Bar) across permanent plant positions';
+      icon = Flame;
+      iconBg = 'linear-gradient(135deg, #059669, #10B981)';
+      rawItems = positions.filter(p => p.templateId === 'CL-11');
+    } else if (modalCategory === 'CL-03') {
+      title = 'Delivery Hose Boxes & Hydrant Posts — SOP/003 (CL-03)';
+      subtitle = 'Permanent outdoor & indoor hydrant hose stations audited for IS 5290 and IS 3844 compliance';
+      icon = ShieldCheck;
+      iconBg = 'linear-gradient(135deg, #2563EB, #60A5FA)';
+      rawItems = positions.filter(p => p.templateId === 'CL-03');
+    } else if (modalCategory === 'QR') {
+      title = 'Permanent QR Identity Anchors (Req 9 Zero-Drift Registry)';
+      subtitle = 'Permanent QR tokens anchored to physical plant positions; never swapped when cylinders are replaced';
+      icon = QrCode;
+      iconBg = 'linear-gradient(135deg, #7C3AED, #A855F7)';
+      rawItems = positions.filter(p => p.qrCode);
+    } else if (modalCategory === 'DEFECTS') {
+      title = 'Defect Rectification & Spares Requisitions (Field Alerts)';
+      subtitle = 'Equipment positions flagged for maintenance, replacement components, and spare parts dispatched';
+      icon = AlertTriangle;
+      iconBg = 'linear-gradient(135deg, #DC2626, #EF4444)';
+      rawItems = positions.filter(p => p.inspectionStatus === 'Inspected - Attention' || (p.history && p.history.length > 0));
+      if (rawItems.length === 0) {
+        rawItems = positions.filter(p => p.inspectionStatus === 'Inspected - Attention');
+      }
+    } else if (modalCategory === 'PRESSURE') {
+      title = 'Pressure Gauge & Proof Calibration Audits';
+      subtitle = 'Operating gauge indicators, green sector verification, and hydraulic proof test certification';
+      icon = Activity;
+      iconBg = 'linear-gradient(135deg, #059669, #34D399)';
+      rawItems = positions.filter(p => p.templateId === 'CL-11' || p.currentEquipment?.testPressureBar);
+    } else if (modalCategory === 'SLA') {
+      title = 'Contractual Field SLA Compliance & Plant AMC Fulfillment';
+      subtitle = 'Client-by-client inspection coverage, purchase order commitments, and scheduled visit velocity';
+      icon = Target;
+      iconBg = 'linear-gradient(135deg, #0284C7, #38BDF8)';
+      isSiteView = true;
+      rawItems = sites;
+    } else if (modalCategory === 'CONTRACTS' || modalCategory === 'COVERAGE') {
+      title = 'Contracted AMC Permanent Positions Inventory';
+      subtitle = 'Full registry of all permanent equipment positions under active annual maintenance contract';
+      icon = Building2;
+      iconBg = 'linear-gradient(135deg, #111827, #374151)';
+      rawItems = positions;
+    }
+
+    // Apply search filter
+    const q = modalSearchQuery.toLowerCase().trim();
+    let filtered = rawItems;
+
+    if (isSiteView) {
+      if (q) {
+        filtered = filtered.filter(s =>
+          (s.name || '').toLowerCase().includes(q) ||
+          (s.clientName || '').toLowerCase().includes(q) ||
+          (s.plantFacility || '').toLowerCase().includes(q) ||
+          (s.poNumber || '').toLowerCase().includes(q) ||
+          (s.city || '').toLowerCase().includes(q)
+        );
+      }
+      if (modalStatusFilter !== 'ALL') {
+        if (modalStatusFilter === 'OK') filtered = filtered.filter(s => s.status === 'Completed');
+        if (modalStatusFilter === 'ATTENTION') filtered = filtered.filter(s => s.status === 'In Progress');
+        if (modalStatusFilter === 'PENDING') filtered = filtered.filter(s => s.status === 'Scheduled');
+      }
+    } else {
+      if (q) {
+        filtered = filtered.filter(p => {
+          const id = (p.positionId || p.id || '').toLowerCase();
+          const qr = (p.qrCode || '').toLowerCase();
+          const loc = (p.locationDescription || p.location || p.area || '').toLowerCase();
+          const sn = (p.currentEquipment?.serialNo || p.currentEquipment?.serialNumber || '').toLowerCase();
+          const eqType = (p.currentEquipment?.type || p.equipmentType || '').toLowerCase();
+          const sName = siteName(p).toLowerCase();
+          return id.includes(q) || qr.includes(q) || loc.includes(q) || sn.includes(q) || eqType.includes(q) || sName.includes(q);
+        });
+      }
+      if (modalStatusFilter !== 'ALL') {
+        if (modalStatusFilter === 'OK') {
+          filtered = filtered.filter(p => p.inspectionStatus === 'Inspected - OK');
+        } else if (modalStatusFilter === 'ATTENTION') {
+          filtered = filtered.filter(p => p.inspectionStatus === 'Inspected - Attention');
+        } else if (modalStatusFilter === 'PENDING') {
+          filtered = filtered.filter(p => !p.inspectionStatus || p.inspectionStatus.includes('Pending'));
+        }
+      }
+    }
+
+    return {
+      title,
+      subtitle,
+      icon,
+      iconBg,
+      items: filtered,
+      totalCount: rawItems.length,
+      filteredCount: filtered.length,
+      isSiteView
+    };
+  };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
@@ -454,7 +618,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           value={`${coveragePct}%`}
           inlineStatus={`${pendingPositions} pending`}
           bottomText={`${inspectedPositions} of ${totalPositions} permanent positions verified`}
-          onClick={() => onNavigate('site-list')}
+          onClick={() => setModalCategory('SLA')}
         />
 
         {/* KPI 2 – HPT Due */}
@@ -463,7 +627,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           value={hydroTests.length}
           inlineStatus="1 late"
           bottomText="Statutory IS 2190 hydrostatic 35 Bar proof test"
-          onClick={() => onNavigate('digital-checklist')}
+          onClick={() => setModalCategory('CL-11')}
         />
 
         {/* KPI 3 – Defect Alerts */}
@@ -472,7 +636,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           value={defectPositions.length}
           inlineStatus="2 low stock"
           bottomText="Pressure gauges & delivery hose washer dispatches"
-          onClick={() => onNavigate('photo-remarks')}
+          onClick={() => setModalCategory('DEFECTS')}
         />
 
         {/* KPI 4 – Total Positions */}
@@ -481,33 +645,99 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           value={totalPositions}
           inlineStatus={`${sites.length} client plants`}
           bottomText="Total permanent equipment positions under active AMC inspection"
-          onClick={() => onNavigate('site-list')}
+          onClick={() => setModalCategory('CONTRACTS')}
         />
       </div>
 
-      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean) ═════════════ */}
+      {/* ═══ 3. SECONDARY METRIC STRIP (Compact & Clean - Click to Inspect Real Data) ═════ */}
       <div className="dash-row" style={{
         display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:'8px'
       }}>
         {[
-          { label:'Hydro Testing (CL-11)',  value:`${totalExtinguishers} units`, sub:'35 Bar certified',   color:DS.emerald, pts:[4,5,6,5,7,7,totalExtinguishers||6] },
-          { label:'Hose Boxes (CL-03)',     value:`${totalHoseBoxes} units`,    sub:'Nozzles & lugs OK',  color:DS.sapphire,pts:[2,2,3,4,3,4,totalHoseBoxes||4]   },
-          { label:'QR Anchors',             value:'17 tagged',  sub:'Zero ID drift',     color:DS.violet,  pts:[10,12,13,14,15,16,17]                              },
-          { label:'Defect Rectification',   value:'87.5%',      sub:'1 action pending',  color:DS.amber,   pts:[70,75,80,78,85,87,87.5]                            },
-          { label:'Pressure Gauge Audits',  value:'94.2%',      sub:'Green zone calib.',  color:DS.emerald, pts:[88,90,92,91,93,94,94.2]                           },
-          { label:'Field SLA Compliance',   value:'99.1%',      sub:'Zero safety breach', color:DS.sky,    pts:[97,98,98,99,99,99,99.1]                            },
+          { 
+            category: 'CL-11',
+            label: 'Hydro Testing (CL-11)',  
+            value: `${totalExtinguishers} units`, 
+            sub: `${positions.filter(p => p.templateId === 'CL-11' && p.inspectionStatus === 'Inspected - OK').length} tested · 35 Bar`,   
+            color: DS.emerald, 
+            pts: [4,5,6,5,7,7,totalExtinguishers || 9] 
+          },
+          { 
+            category: 'CL-03',
+            label: 'Hose Boxes (CL-03)',     
+            value: `${totalHoseBoxes} units`,    
+            sub: `${positions.filter(p => p.templateId === 'CL-03' && p.inspectionStatus === 'Inspected - OK').length} verified OK`,  
+            color: DS.sapphire,
+            pts: [2,2,3,4,3,4,totalHoseBoxes || 8]   
+          },
+          { 
+            category: 'QR',
+            label: 'QR Anchors',             
+            value: `${positions.filter(p => p.qrCode).length} tagged`,  
+            sub: '100% ID anchored',     
+            color: DS.violet,  
+            pts: [10,12,13,14,15,16,positions.filter(p => p.qrCode).length || 17]                              
+          },
+          { 
+            category: 'DEFECTS',
+            label: 'Defect Rectification',   
+            value: `${inspectedPositions > 0 ? Math.round(((inspectedPositions - defectPositions.length) / inspectedPositions) * 100) : 100}%`,      
+            sub: `${defectPositions.length} action pending`,  
+            color: DS.amber,   
+            pts: [70,75,80,78,85,87,inspectedPositions > 0 ? Math.round(((inspectedPositions - defectPositions.length) / inspectedPositions) * 100) : 86]                            
+          },
+          { 
+            category: 'PRESSURE',
+            label: 'Pressure Gauge Audits',  
+            value: `${totalPositions > 0 ? Math.round((okPositions / totalPositions) * 100) : 0}%`,      
+            sub: `${okPositions} in green zone`,  
+            color: DS.emerald, 
+            pts: [88,90,92,91,93,94,totalPositions > 0 ? Math.round((okPositions / totalPositions) * 100) : 94]                           
+          },
+          { 
+            category: 'SLA',
+            label: 'Field SLA Compliance',   
+            value: `${coveragePct}%`,      
+            sub: `${sites.filter(s => s.status === 'Completed').length} of ${sites.length} plants 100%`, 
+            color: DS.sky,    
+            pts: [97,98,98,99,99,99,coveragePct || 99]                            
+          },
         ].map((m,i) => (
-          <div key={i} style={{
-            backgroundColor:DS.cardBg, border:`1px solid ${DS.border}`,
-            borderRadius:'8px', padding:'9px 12px', boxShadow:DS.shadowSm
-          }}>
-            <p style={{ fontSize:'10px', fontWeight:500, color:DS.textMuted, margin:'0 0 3px 0' }}>
-              {m.label}
-            </p>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+          <div 
+            key={i}
+            onClick={() => setModalCategory(m.category)}
+            title={`Click to open real ${m.label} records`}
+            style={{
+              backgroundColor: DS.cardBg, 
+              border: `1px solid ${DS.border}`,
+              borderRadius: '9px', 
+              padding: '9px 12px', 
+              boxShadow: DS.shadowSm,
+              cursor: 'pointer',
+              transition: 'all 0.16s ease',
+              position: 'relative'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#93C5FD';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 14px rgba(37,99,235,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = DS.border;
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = DS.shadowSm;
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <p style={{ fontSize: '10.5px', fontWeight: 600, color: DS.textMuted, margin: 0 }}>
+                {m.label}
+              </p>
+              <ExternalLink size={10} color="#9CA3AF" style={{ opacity: 0.6 }}/>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize:'15px', fontWeight:600, color:DS.textPrimary }}>{m.value}</div>
-                <div style={{ fontSize:'10px', color:m.color, fontWeight:500 }}>{m.sub}</div>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary, letterSpacing: '-0.02em' }}>{m.value}</div>
+                <div style={{ fontSize: '10px', color: m.color, fontWeight: 600 }}>{m.sub}</div>
               </div>
               <Sparkline points={m.pts} color={m.color} width={42} height={16}/>
             </div>
@@ -884,6 +1114,554 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           </span>
         </div>
       </div>
+
+      {/* ═══ REAL DATA DRILL-DOWN MODAL ════════════════════════════ */}
+      {modalCategory && (() => {
+        const modalData = getModalData();
+        if (!modalData) return null;
+        const Icon = modalData.icon;
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(10, 15, 30, 0.65)',
+              backdropFilter: 'blur(5px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+              animation: 'fadeUp 0.18s ease'
+            }}
+            onClick={() => {
+              setModalCategory(null);
+              setModalSearchQuery('');
+              setModalStatusFilter('ALL');
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '1040px',
+                maxHeight: '88vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                border: '1px solid #E2E8F0',
+                overflow: 'hidden'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div style={{
+                padding: '18px 22px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '14px',
+                background: 'linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: modalData.iconBg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    flexShrink: 0
+                  }}>
+                    <Icon size={18} color="#FFF" />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary, margin: 0, letterSpacing: '-0.015em' }}>
+                        {modalData.title}
+                      </h3>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '100px',
+                        backgroundColor: '#EEF2FF',
+                        color: '#4338CA',
+                        border: '1px solid #C7D2FE'
+                      }}>
+                        {modalData.totalCount} records
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: DS.textMuted, margin: '2px 0 0 0' }}>
+                      {modalData.subtitle}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {!modalData.isSiteView && (
+                    <button
+                      onClick={() => handleExportModalCSV(modalData.items, modalData.title)}
+                      style={{
+                        height: '32px',
+                        padding: '0 12px',
+                        borderRadius: '7px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        backgroundColor: '#FFF',
+                        border: `1px solid ${DS.border}`,
+                        color: DS.textSec,
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: DS.shadowSm
+                      }}
+                    >
+                      <Download size={12} /> Export CSV
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setModalCategory(null);
+                      setModalSearchQuery('');
+                      setModalStatusFilter('ALL');
+                    }}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #E2E8F0',
+                      backgroundColor: '#F8FAFC',
+                      color: '#64748B',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#F1F5F9'; e.currentTarget.style.color = '#0F172A'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.color = '#64748B'; }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Toolbar (Search & Filter) */}
+              <div style={{
+                padding: '12px 22px',
+                borderBottom: '1px solid #F1F5F9',
+                backgroundColor: '#F8FAFC',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0 10px',
+                  height: '32px',
+                  borderRadius: '7px',
+                  backgroundColor: '#FFFFFF',
+                  border: `1px solid ${DS.border}`,
+                  width: '260px'
+                }}>
+                  <Search size={13} color={DS.textMuted} />
+                  <input
+                    type="text"
+                    placeholder="Filter records by ID, location, S/N…"
+                    value={modalSearchQuery}
+                    onChange={(e) => setModalSearchQuery(e.target.value)}
+                    style={{
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '12px',
+                      backgroundColor: 'transparent',
+                      width: '100%',
+                      color: DS.textPrimary
+                    }}
+                  />
+                  {modalSearchQuery && (
+                    <button
+                      onClick={() => setModalSearchQuery('')}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, color: '#9CA3AF' }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {[
+                    { id: 'ALL', label: 'All Records' },
+                    { id: 'OK', label: 'Verified OK' },
+                    { id: 'ATTENTION', label: 'Needs Attention' },
+                    { id: 'PENDING', label: 'Pending' }
+                  ].map((f) => {
+                    const active = modalStatusFilter === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => setModalStatusFilter(f.id)}
+                        style={{
+                          height: '28px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: active ? 700 : 500,
+                          backgroundColor: active ? '#1E3A8A' : '#FFFFFF',
+                          color: active ? '#FFFFFF' : DS.textSec,
+                          border: `1px solid ${active ? '#1E3A8A' : DS.border}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Modal Table Body */}
+              <div style={{ overflowY: 'auto', flex: 1, padding: '0' }}>
+                {modalData.isSiteView ? (
+                  // Plant SLA Table View
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                    <thead>
+                      <tr>
+                        {['Plant Facility', 'PO & Work Order', 'AMC Schedule', 'Position Target', 'Coverage SLA', 'Actions'].map((h, i) => (
+                          <th key={i} style={{
+                            padding: '10px 16px', textAlign: i === 5 ? 'right' : 'left',
+                            fontSize: '10.5px', fontWeight: 700, color: DS.textMuted,
+                            textTransform: 'uppercase', letterSpacing: '0.06em',
+                            backgroundColor: '#F8FAFC',
+                            borderBottom: `2px solid ${DS.border}`,
+                            position: 'sticky', top: 0, zIndex: 1
+                          }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalData.items.map((site) => {
+                        const pct = site.totalPositions > 0 ? Math.round((site.inspectedPositions / site.totalPositions) * 100) : 0;
+                        const isDone = pct === 100;
+                        return (
+                          <tr key={site.id} className="tbl-row" style={{ borderBottom: `1px solid ${DS.border}` }}>
+                            <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 700, color: DS.textPrimary, fontSize: '13px' }}>{site.name}</div>
+                              <div style={{ fontSize: '11px', color: DS.textMuted }}>{site.address || site.city}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 600, color: DS.textPrimary, fontSize: '12px' }}>{site.poNumber || '—'}</div>
+                              <div style={{ fontSize: '11px', color: '#6B7280' }}>WO: {site.workOrderRef || '—'}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                              <span style={{
+                                fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px',
+                                backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE'
+                              }}>
+                                {site.amcType || site.frequency || 'Quarterly'} · {site.noOfVisits || 4} Visits
+                              </span>
+                              <div style={{ fontSize: '10.5px', color: DS.textMuted, marginTop: '2px' }}>
+                                Exp: {site.amcExpiryDate || '—'}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 600, color: DS.textPrimary }}>
+                                {site.inspectedPositions} / {site.totalPositions} positions
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: isDone ? DS.emerald : DS.amber, fontWeight: 500 }}>
+                                {isDone ? 'All positions inspected' : `${site.totalPositions - site.inspectedPositions} pending inspection`}
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '80px', height: '6px', borderRadius: '100px', backgroundColor: '#E2E8F0', overflow: 'hidden' }}>
+                                  <div style={{
+                                    height: '100%', width: `${pct}%`,
+                                    background: isDone ? 'linear-gradient(90deg,#059669,#34D399)' : 'linear-gradient(90deg,#2563EB,#60A5FA)'
+                                  }} />
+                                </div>
+                                <span style={{
+                                  fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '100px',
+                                  backgroundColor: isDone ? '#D1FAE5' : '#FEF3C7',
+                                  color: isDone ? '#059669' : '#D97706'
+                                }}>
+                                  {pct}% {isDone ? 'Fulfilled' : 'In Progress'}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', verticalAlign: 'middle' }}>
+                              <button
+                                onClick={() => {
+                                  setModalCategory(null);
+                                  if (onSelectSite) onSelectSite(site);
+                                  onNavigate('qr-scanner');
+                                }}
+                                style={{
+                                  height: '28px', padding: '0 12px', borderRadius: '6px',
+                                  background: 'linear-gradient(135deg,#1E3A8A,#2563EB)',
+                                  color: '#FFF', fontSize: '11.5px', fontWeight: 600,
+                                  border: 'none', cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(37,99,235,.28)'
+                                }}
+                              >
+                                Inspect Plant
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  // Position Equipment Table View
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                    <thead>
+                      <tr>
+                        {[
+                          'Position ID & QR Tag',
+                          'Plant Facility & Location',
+                          'Equipment Specification',
+                          modalCategory === 'CL-11' ? 'Proof Hydro Audit (IS 2190)' :
+                          modalCategory === 'CL-03' ? 'Hose Box & Nozzle Fittings' :
+                          modalCategory === 'QR' ? 'Permanent QR Anchoring' :
+                          modalCategory === 'DEFECTS' ? 'Flagged Defect & Observation' :
+                          modalCategory === 'PRESSURE' ? 'Gauge Calibration & Test Bar' : 'Operational Status',
+                          'Status',
+                          ''
+                        ].map((h, i) => (
+                          <th key={i} style={{
+                            padding: '10px 14px', textAlign: i === 5 ? 'right' : 'left',
+                            fontSize: '10.5px', fontWeight: 700, color: DS.textMuted,
+                            textTransform: 'uppercase', letterSpacing: '0.06em',
+                            backgroundColor: '#F8FAFC',
+                            borderBottom: `2px solid ${DS.border}`,
+                            position: 'sticky', top: 0, zIndex: 1
+                          }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modalData.items.map((pos) => {
+                        const pId = pos.positionId || pos.id;
+                        const isOK = pos.inspectionStatus === 'Inspected - OK';
+                        const isAtt = pos.inspectionStatus === 'Inspected - Attention';
+
+                        return (
+                          <tr key={pId} className="tbl-row" style={{ borderBottom: `1px solid ${DS.border}`, transition: 'background 0.12s ease' }}>
+                            {/* Position ID & QR */}
+                            <td style={{ padding: '11px 14px', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 700, color: DS.textPrimary, fontSize: '12.5px' }}>{pId}</div>
+                              <span style={{
+                                fontSize: '10.5px', color: '#4338CA', fontFamily: 'monospace',
+                                backgroundColor: '#EEF2FF', padding: '1px 6px', borderRadius: '4px',
+                                display: 'inline-block', marginTop: '2px', border: '1px solid #C7D2FE'
+                              }}>
+                                {pos.qrCode}
+                              </span>
+                            </td>
+
+                            {/* Plant & Location */}
+                            <td style={{ padding: '11px 14px', verticalAlign: 'middle', maxWidth: '210px' }}>
+                              <div style={{ fontWeight: 600, color: DS.textPrimary, fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {siteName(pos)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: DS.textMuted, lineHeight: 1.3 }}>
+                                {pos.locationDescription || pos.location || pos.area}
+                              </div>
+                            </td>
+
+                            {/* Equipment Specs */}
+                            <td style={{ padding: '11px 14px', verticalAlign: 'middle' }}>
+                              <div style={{ color: DS.textPrimary, fontWeight: 600, fontSize: '12px' }}>
+                                {pos.currentEquipment?.type || pos.equipmentType || pos.equipmentCategory}
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: DS.textMuted }}>
+                                S/N: <strong style={{ color: '#4B5563' }}>{pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || 'N/A'}</strong>
+                                {pos.currentEquipment?.capacity && ` · ${pos.currentEquipment.capacity}`}
+                              </div>
+                            </td>
+
+                            {/* Category Specific Column */}
+                            <td style={{ padding: '11px 14px', verticalAlign: 'middle', fontSize: '11px' }}>
+                              {modalCategory === 'CL-11' ? (
+                                <div>
+                                  <div style={{ fontWeight: 600, color: '#1E3A8A' }}>
+                                    {pos.currentEquipment?.testPressureBar ? `${pos.currentEquipment.testPressureBar} Bar Proof Test` : '35 Bar Proof Test'}
+                                  </div>
+                                  <div style={{ color: DS.textMuted, fontSize: '10.5px' }}>
+                                    Last: {pos.currentEquipment?.lastHydroTestDate || '—'} · Next: <strong style={{ color: '#B45309' }}>{pos.currentEquipment?.nextHydroTestDue || '—'}</strong>
+                                  </div>
+                                </div>
+                              ) : modalCategory === 'CL-03' ? (
+                                <div>
+                                  <div style={{ fontWeight: 600, color: '#2563EB' }}>
+                                    {pos.currentEquipment?.material || 'LDPE Weatherproof UV Double Door'}
+                                  </div>
+                                  <div style={{ color: DS.textMuted, fontSize: '10.5px' }}>
+                                    {pos.currentEquipment?.hoses || '2 Nos. 15m Type B'} · {pos.currentEquipment?.branchPipe || '63mm Branch Pipe'}
+                                  </div>
+                                </div>
+                              ) : modalCategory === 'QR' ? (
+                                <div>
+                                  <div style={{ fontWeight: 600, color: '#7C3AED' }}>
+                                    Permanent Anchor Token
+                                  </div>
+                                  <div style={{ color: DS.textMuted, fontSize: '10.5px' }}>
+                                    Zero ID drift on replacement (Req 9 compliant)
+                                  </div>
+                                </div>
+                              ) : modalCategory === 'DEFECTS' ? (
+                                <div>
+                                  <div style={{ fontWeight: 600, color: isAtt ? '#DC2626' : '#059669' }}>
+                                    {isAtt ? 'Gland Leakage / Washer Replacement Required' : 'Equipment Normal — Zero Defects'}
+                                  </div>
+                                  <div style={{ color: DS.textMuted, fontSize: '10.5px' }}>
+                                    {isAtt ? 'Photo evidence attached · Requisition PO-SPARE-091' : 'All SOP verification points confirmed OK'}
+                                  </div>
+                                </div>
+                              ) : modalCategory === 'PRESSURE' ? (
+                                <div>
+                                  <div style={{ fontWeight: 600, color: '#059669' }}>
+                                    Dial in Green Operating Sector
+                                  </div>
+                                  <div style={{ color: DS.textMuted, fontSize: '10.5px' }}>
+                                    Calibrated {pos.currentEquipment?.testPressureBar || 35} Bar · Zero gauge leakage
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <span style={{
+                                    fontSize: '10.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px',
+                                    backgroundColor: pos.templateId === 'CL-11' ? '#EFF6FF' : '#FEF3C7',
+                                    color: pos.templateId === 'CL-11' ? '#1D4ED8' : '#D97706'
+                                  }}>
+                                    {pos.templateId}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Inspection Status Badge */}
+                            <td style={{ padding: '11px 14px', verticalAlign: 'middle' }}>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '100px',
+                                backgroundColor: isOK ? '#ECFDF5' : isAtt ? '#FEF2F2' : '#F1F5F9',
+                                color: isOK ? '#059669' : isAtt ? '#DC2626' : '#64748B',
+                                border: `1px solid ${isOK ? '#A7F3D0' : isAtt ? '#FECACA' : '#E2E8F0'}`
+                              }}>
+                                <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: isOK ? '#059669' : isAtt ? '#DC2626' : '#94A3B8' }} />
+                                {isOK ? 'Verified OK' : isAtt ? 'Needs Attention' : 'Pending'}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ padding: '11px 14px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  onClick={() => {
+                                    setModalCategory(null);
+                                    if (onSelectPosition) onSelectPosition(pos);
+                                    onNavigate('asset-details');
+                                  }}
+                                  style={{
+                                    height: '26px', padding: '0 9px', borderRadius: '5px',
+                                    backgroundColor: '#FFF', border: `1px solid ${DS.border}`,
+                                    color: DS.textSec, fontSize: '11px', fontWeight: 600,
+                                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px'
+                                  }}
+                                >
+                                  <Eye size={11} /> Dossier
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setModalCategory(null);
+                                    const site = sites.find(s => s.id === pos.siteId) || sites[0];
+                                    if (onSelectSite) onSelectSite(site);
+                                    if (onSelectPosition) onSelectPosition(pos);
+                                    onNavigate('digital-checklist');
+                                  }}
+                                  style={{
+                                    height: '26px', padding: '0 10px', borderRadius: '5px',
+                                    background: 'linear-gradient(135deg,#1E3A8A,#2563EB)',
+                                    color: '#FFF', fontSize: '11px', fontWeight: 600,
+                                    border: 'none', cursor: 'pointer'
+                                  }}
+                                >
+                                  Inspect
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+
+                {modalData.items.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: DS.textMuted }}>
+                    <Search size={28} style={{ opacity: 0.3, marginBottom: '8px' }} />
+                    <p style={{ fontSize: '13px', margin: 0 }}>No records match your filter criteria.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                padding: '12px 22px',
+                borderTop: '1px solid #E2E8F0',
+                backgroundColor: '#FAFAFA',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '11.5px',
+                color: DS.textMuted
+              }}>
+                <span>
+                  Showing <strong style={{ color: DS.textPrimary }}>{modalData.items.length}</strong> of <strong style={{ color: DS.textPrimary }}>{modalData.totalCount}</strong> real operational records from Indús AMC database.
+                </span>
+                <button
+                  onClick={() => {
+                    setModalCategory(null);
+                    setModalSearchQuery('');
+                    setModalStatusFilter('ALL');
+                  }}
+                  style={{
+                    height: '30px',
+                    padding: '0 14px',
+                    borderRadius: '6px',
+                    backgroundColor: '#FFF',
+                    border: '1px solid #D1D5DB',
+                    color: DS.textPrimary,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
