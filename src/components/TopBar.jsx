@@ -3,32 +3,18 @@ import {
   Search, 
   Menu, 
   Bell, 
-  Building2, 
-  ChevronDown, 
-  Check, 
-  AlertTriangle, 
-  Info,
-  ExternalLink,
-  X,
-  Cloud,
-  Database
+  Cloud
 } from 'lucide-react';
 import NetworkStatusBadge from './NetworkStatusBadge';
-import { getSites } from '../data/storage';
 
 export default function TopBar({ 
   currentScreen, 
   onNavigate, 
   onToggleMobileMenu, 
   onOpenCommandPalette,
-  onOpenSupabaseBackup,
-  activeSite,
-  onSelectSite
+  onOpenSupabaseBackup
 }) {
-  const [showSiteDropdown, setShowSiteDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-
-  const sites = getSites();
 
   // Screen title mapping
   const SCREEN_TITLES = {
@@ -177,98 +163,8 @@ export default function TopBar({
         </div>
       </div>
 
-      {/* Right: Site Selector, Network Status, & Notifications */}
+      {/* Right: Network Status, Cloud & Notifications */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        
-        {/* Plant / Site Selector Pill */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button
-            onClick={() => setShowSiteDropdown(!showSiteDropdown)}
-            style={{
-              height: '32px',
-              minHeight: '32px',
-              padding: '0 9px',
-              borderRadius: '6px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#1E293B',
-              cursor: 'pointer',
-              boxSizing: 'border-box',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Building2 size={14} color="#DC2626" style={{ flexShrink: 0 }} />
-            <span style={{
-              maxWidth: '120px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {activeSite ? activeSite.name : 'Select Plant'}
-            </span>
-            <ChevronDown size={13} color="#64748B" style={{ flexShrink: 0 }} />
-          </button>
-
-          {/* Plant Selector Dropdown */}
-          {showSiteDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: '6px',
-              width: '280px',
-              backgroundColor: '#FFFFFF',
-              borderRadius: '10px',
-              border: '1px solid #E5E7EB',
-              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-              padding: '6px',
-              zIndex: 90
-            }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', padding: '6px 8px' }}>
-                Select Industrial Plant
-              </div>
-              {sites.map(s => {
-                const isSelected = activeSite?.id === s.id;
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => {
-                      if (onSelectSite) onSelectSite(s);
-                      setShowSiteDropdown(false);
-                    }}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: isSelected ? '#FEF2F2' : 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = '#F9FAFB';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827' }}>{s.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>{s.city} • {s.totalPositions} positions</div>
-                    </div>
-                    {isSelected && <Check size={14} color="#DC2626" />}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* Compact Network Status Badge */}
         <NetworkStatusBadge />
 
@@ -309,7 +205,7 @@ export default function TopBar({
             flexShrink: 0
           }} />
           <Cloud size={14} color="#16A34A" style={{ flexShrink: 0 }} />
-          <span>Supabase</span>
+          <span>Supabase Cloud</span>
         </button>
 
         {/* Notification Bell */}

@@ -521,8 +521,6 @@ export default function App() {
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenSupabaseBackup={() => setIsSupabaseModalOpen(true)}
-          activeSite={activeSite}
-          onSelectSite={handleSelectSite}
         />
 
         {/* Yellow/Amber Demo Notice Banner */}
