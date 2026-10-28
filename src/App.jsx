@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Flame, CheckCircle2 } from 'lucide-react';
+import { Flame, CheckCircle2, AlertCircle, Camera, ArrowRight, ShieldAlert } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import DemoNoticeBanner from './components/DemoNoticeBanner';
@@ -9,6 +9,7 @@ import TemplateMappingsModal from './components/TemplateMappingsModal';
 import EquipmentMasterModal from './components/EquipmentMasterModal';
 import SupabaseBackupModal from './components/SupabaseBackupModal';
 import { autoSyncToSupabase, fetchPositionFromSupabase } from './services/supabaseBackup';
+import { parseScannedQRToken } from './utils/qrUrlHelper';
 
 import LoginScreen from './screens/LoginScreen';
 import SiteListScreen from './screens/SiteListScreen';
@@ -34,17 +35,46 @@ import {
 
 // Synchronously detect if launched directly via scanned QR code URL
 const detectInitialScanState = () => {
-  if (typeof window === 'undefined') return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null };
+  if (typeof window === 'undefined') return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null, isInvalidQR: false };
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    const scanCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id');
-    if (scanCode) {
+    let rawCode = urlParams.get('scan') || urlParams.get('pos') || urlParams.get('qr') || urlParams.get('id') || urlParams.get('token');
+
+    // Check pathname: e.g. /M-M/qr/IFS-QR-000001 or /qr/IFS-QR-000001
+    if (!rawCode && window.location.pathname) {
+      const pathMatch = window.location.pathname.match(/(?:\/qr\/|\/scan\/|\/pos\/|\/tag\/)([^\/\?\#]+)/i);
+      if (pathMatch && pathMatch[1]) {
+        rawCode = decodeURIComponent(pathMatch[1]);
+      }
+    }
+
+    // Check hash: e.g. #/qr/IFS-QR-000001
+    if (!rawCode && window.location.hash) {
+      const hashMatch = window.location.hash.match(/(?:\/qr\/|\/scan\/|\/pos\/|\/tag\/)([^\/\?\#]+)/i);
+      if (hashMatch && hashMatch[1]) {
+        rawCode = decodeURIComponent(hashMatch[1]);
+      }
+    }
+
+    // Check pending QR preserved across authentication
+    if (!rawCode && typeof sessionStorage !== 'undefined') {
+      rawCode = sessionStorage.getItem('ifspl_pending_qr');
+    }
+
+    if (rawCode) {
+      const scanCode = parseScannedQRToken(rawCode);
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('ifspl_pending_qr', scanCode);
+      }
+
       initStorage();
       const resolved = resolveScannedAssetPosition(scanCode, urlParams);
+
+      // Case 1: Unassigned pre-printed QR code in registry
       if (resolved && resolved.isUnassignedQR) {
-        // Scanned an unassigned pre-printed QR code: open asset registration directly
         return {
           isDirectScan: false,
+          isInvalidQR: false,
           scanCode,
           position: null,
           site: getSites()[0] || null,
@@ -53,22 +83,40 @@ const detectInitialScanState = () => {
         };
       }
 
-      const pos = resolved;
-      const sites = getSites();
-      const site = pos ? (sites.find(s => s.id === pos.siteId) || sites[0]) : (sites[0] || null);
-      return {
-        isDirectScan: true,
-        scanCode,
-        position: pos,
-        site: site,
-        prefilledQR: null,
-        initialScreen: 'digital-checklist'
-      };
+      // Case 2: Invalid or retired QR code
+      if (resolved && resolved.isInvalidQR) {
+        return {
+          isDirectScan: false,
+          isInvalidQR: true,
+          scanCode,
+          errorMessage: resolved.error || `QR Code "${scanCode}" is not recognized in the permanent registry.`,
+          position: null,
+          site: null,
+          prefilledQR: null,
+          initialScreen: 'invalid-qr'
+        };
+      }
+
+      // Case 3: Valid assigned asset position
+      if (resolved && resolved.positionId) {
+        const pos = resolved;
+        const sites = getSites();
+        const site = pos ? (sites.find(s => s.id === pos.siteId) || sites[0]) : (sites[0] || null);
+        return {
+          isDirectScan: true,
+          isInvalidQR: false,
+          scanCode,
+          position: pos,
+          site: site,
+          prefilledQR: null,
+          initialScreen: 'digital-checklist'
+        };
+      }
     }
   } catch (e) {
     console.warn('Initial scan detection error:', e);
   }
-  return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null };
+  return { isDirectScan: false, scanCode: null, position: null, site: null, prefilledQR: null, isInvalidQR: false };
 };
 
 export default function App() {
@@ -80,6 +128,9 @@ export default function App() {
   const [activeSite, setActiveSite] = useState(initialScan.site || null);
   const [activePosition, setActivePosition] = useState(initialScan.position || null);
   const [prefilledQR, setPrefilledQR] = useState(initialScan.prefilledQR || null);
+  const [invalidQRInfo, setInvalidQRInfo] = useState(
+    initialScan.isInvalidQR ? { token: initialScan.scanCode, error: initialScan.errorMessage } : null
+  );
   const [currentUser, setCurrentUserState] = useState(getCurrentUser());
 
   // Layout UI state
@@ -155,11 +206,182 @@ export default function App() {
     setActivePosition(position);
   };
 
-  // Full-page login screen
+  // Full-page login screen with QR redirect preservation (Requirement 3)
   if (currentScreen === 'login') {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA' }}>
-        <LoginScreen onNavigate={navigateTo} />
+        <LoginScreen 
+          onNavigate={navigateTo} 
+          onLoginSuccess={(user, pendingQR) => {
+            setCurrentUserState(user);
+            if (pendingQR) {
+              const res = resolveScannedAssetPosition(pendingQR);
+              if (res && res.isUnassignedQR) {
+                setPrefilledQR(res.qrRecord);
+                setInvalidQRInfo(null);
+                navigateTo('asset-register');
+                return;
+              }
+              if (res && res.positionId) {
+                setActivePosition(res);
+                setIsDirectScanMode(true);
+                setInvalidQRInfo(null);
+                navigateTo('digital-checklist');
+                return;
+              }
+              if (res && res.isInvalidQR) {
+                setInvalidQRInfo({ token: pendingQR, error: res.error });
+                navigateTo('invalid-qr');
+                return;
+              }
+            }
+            if (user.role === 'client') {
+              navigateTo('client-portal');
+            } else if (user.role === 'manager') {
+              navigateTo('manager-dashboard');
+            } else {
+              navigateTo('site-list');
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Invalid or Retired QR Code Screen (Requirement 2: Step 3)
+  if (currentScreen === 'invalid-qr' || (isDirectScanMode && invalidQRInfo)) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#F8FAFC',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px'
+      }}>
+        <div style={{
+          maxWidth: '520px',
+          width: '100%',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          border: '1px solid #E2E8F0',
+          padding: '36px 24px',
+          textAlign: 'center',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: '#FEF2F2',
+            color: '#DC2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px'
+          }}>
+            <ShieldAlert size={34} />
+          </div>
+          <h2 style={{ fontSize: '19px', fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>
+            Unrecognized or Retired QR Code
+          </h2>
+          <p style={{ fontSize: '13.5px', color: '#64748B', margin: '0 0 16px', lineHeight: 1.5 }}>
+            {invalidQRInfo?.error || initialScan.errorMessage || 'This QR token was not found in the asset database or permanent registry.'}
+          </p>
+          <div style={{
+            padding: '8px 16px',
+            backgroundColor: '#F1F5F9',
+            borderRadius: '6px',
+            border: '1px dashed #CBD5E1',
+            display: 'inline-block',
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: '#334155',
+            marginBottom: '24px'
+          }}>
+            {invalidQRInfo?.token || initialScan.scanCode || 'UNKNOWN-QR'}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('ifspl_pending_qr'); } catch (e) {}
+                setIsDirectScanMode(false);
+                setInvalidQRInfo(null);
+                navigateTo('qr-scanner');
+              }}
+              className="btn-primary"
+              style={{
+                height: '42px',
+                fontSize: '13.5px',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                backgroundColor: '#111827',
+                color: '#FFFFFF',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Camera size={16} />
+              <span>Scan Another QR Code</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('ifspl_pending_qr'); } catch (e) {}
+                setIsDirectScanMode(false);
+                setInvalidQRInfo(null);
+                navigateTo('site-list');
+              }}
+              style={{
+                height: '40px',
+                fontSize: '13.5px',
+                fontWeight: 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#FFFFFF',
+                color: '#334155',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              <span>View Sites & Asset List</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('ifspl_pending_qr'); } catch (e) {}
+                setIsDirectScanMode(false);
+                setInvalidQRInfo(null);
+                navigateTo('manager-dashboard');
+              }}
+              style={{
+                height: '40px',
+                fontSize: '13.5px',
+                fontWeight: 500,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'transparent',
+                color: '#64748B',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <span>Return to Manager Portal</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

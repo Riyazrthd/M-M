@@ -4,6 +4,7 @@
 
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { buildQRScanUrl } from './qrUrlHelper.js';
 
 /**
  * Generate high-resolution printable PDF containing bulk QR labels
@@ -52,11 +53,10 @@ export async function generateBulkQRLabelsPDF(qrRecords, options = {}) {
   const title = options.title || 'INDUS FIRE SAFETY PRIVATE LIMITED';
 
   // 1. Pre-generate all QR code images at 400x400 px resolution for high-DPI razor-sharp printing
+  // Every QR code strictly encodes the canonical deployed application URL: https://riyazrthd.github.io/M-M/qr/TOKEN
   const qrImageMap = {};
   for (const rec of qrRecords) {
-    const payload = options.encodeFullUrl 
-      ? `https://riyazrthd.github.io/M-M/?scan=${rec.token}`
-      : rec.token;
+    const payload = buildQRScanUrl(rec.token);
     try {
       qrImageMap[rec.token] = await QRCode.toDataURL(payload, {
         errorCorrectionLevel: 'M',
@@ -164,13 +164,16 @@ export async function generateBulkQRLabelsPDF(qrRecords, options = {}) {
   }
 
   const fileName = `IFS_QR_Labels_${batchId}_${qrRecords.length}_units.pdf`;
-  doc.save(fileName);
+  if (options.saveToFile !== false && typeof window !== 'undefined' && typeof doc.save === 'function') {
+    doc.save(fileName);
+  }
 
   return {
     success: true,
     fileName,
     totalLabels: qrRecords.length,
-    totalPages
+    totalPages,
+    doc
   };
 }
 
@@ -293,9 +296,7 @@ export async function printBulkQRLabelsPreview(qrRecords, options = {}) {
 
   const qrImageMap = {};
   for (const rec of qrRecords) {
-    const payload = options.encodeFullUrl 
-      ? `https://riyazrthd.github.io/M-M/?scan=${rec.token}`
-      : rec.token;
+    const payload = buildQRScanUrl(rec.token);
     try {
       qrImageMap[rec.token] = await QRCode.toDataURL(payload, {
         errorCorrectionLevel: 'M',

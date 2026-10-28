@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
+import { buildQRScanUrl } from '../utils/qrUrlHelper';
 import { 
   Printer, 
   Download, 
@@ -40,36 +41,8 @@ export default function QRStickerCard({
   const serialNo = position?.currentEquipment?.serialNo || position?.currentEquipment?.serialNumber || position?.serialNumber || 'IFS-2024-2218';
   const formId = position?.templateId || 'CL-11';
 
-  // Direct Mobile Checklist URL (opens the digital checklist directly when scanned by any smartphone camera)
-  const getDirectChecklistUrl = () => {
-    const params = new URLSearchParams();
-    params.set('scan', posId);
-    if (formId) params.set('tmpl', formId);
-    if (equipmentDesc) params.set('eq', equipmentDesc);
-    if (locationDesc) params.set('loc', locationDesc);
-    if (clientName) params.set('client', clientName);
-    if (serialNo) params.set('sn', serialNo);
-
-    if (typeof window !== 'undefined') {
-      const origin = window.location.origin;
-      // If deployed on github.io
-      if (window.location.hostname.includes('github.io')) {
-        let pathname = window.location.pathname.replace(/\/+$/, '');
-        if (!pathname.includes('/docs')) {
-          pathname += '/docs';
-        }
-        return `${origin}${pathname}/?${params.toString()}`;
-      }
-      // If running on localhost, default to GitHub Pages /docs/ URL so smartphone camera opens the live form over mobile internet!
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `https://riyazrthd.github.io/M-M/docs/?${params.toString()}`;
-      }
-      return `${origin}${window.location.pathname}?${params.toString()}`;
-    }
-    return `https://riyazrthd.github.io/M-M/docs/?${params.toString()}`;
-  };
-
-  const activeQRPayload = getDirectChecklistUrl();
+  // Direct Mobile Checklist URL (opens the application and resolves this permanent token)
+  const activeQRPayload = buildQRScanUrl(qrCodeText);
 
   // Generate crimson-red QR code with High Error Correction
   useEffect(() => {

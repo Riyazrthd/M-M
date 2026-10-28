@@ -3,10 +3,12 @@ import { DEMO_USERS } from '../data/sampleData';
 import { setCurrentUser } from '../data/storage';
 import { ShieldCheck, LogIn, Key, Sparkles, Building2, User } from 'lucide-react';
 
-export default function LoginScreen({ onNavigate }) {
+export default function LoginScreen({ onNavigate, onLoginSuccess }) {
   const [selectedUser, setSelectedUser] = useState(DEMO_USERS[0]);
   const [pin, setPin] = useState('1234');
   const [error, setError] = useState('');
+
+  const pendingQR = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ifspl_pending_qr') : null;
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -15,6 +17,12 @@ export default function LoginScreen({ onNavigate }) {
       return;
     }
     setCurrentUser(selectedUser);
+
+    if (onLoginSuccess) {
+      onLoginSuccess(selectedUser, pendingQR);
+      return;
+    }
+
     if (selectedUser.role === 'client') {
       onNavigate('client-portal');
     } else if (selectedUser.role === 'manager') {
@@ -78,6 +86,24 @@ export default function LoginScreen({ onNavigate }) {
         <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
           Standardised On-Site Safety Audit & Compliance Portal
         </p>
+
+        {pendingQR && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            backgroundColor: '#EFF6FF',
+            border: '1px solid #BFDBFE',
+            fontSize: '0.82rem',
+            color: '#1E40AF',
+            textAlign: 'left'
+          }}>
+            <strong>Scanned QR Detected:</strong> <code>{pendingQR}</code>
+            <div style={{ fontSize: '0.76rem', color: '#3B82F6', marginTop: '2px' }}>
+              Sign in to continue directly to your scanned asset inspection or registration.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Login Card */}

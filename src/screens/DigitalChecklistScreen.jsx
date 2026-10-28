@@ -24,6 +24,7 @@ import {
   downloadChecklistPDF,
   downloadChecklistStandaloneHTML
 } from '../utils/checklistPDFExporter';
+import { parseScannedQRToken } from '../utils/qrUrlHelper';
 import PhotoCapture from '../components/PhotoCapture';
 import { 
   Check, 
@@ -283,7 +284,7 @@ export default function DigitalChecklistScreen({
   };
 
   const handleSelectAssetByCode = (code) => {
-    const clean = (code || '').trim();
+    const clean = parseScannedQRToken(code);
     if (!clean) return;
 
     // Check if this is an unassigned QR code from advance bulk generation (Module 3)

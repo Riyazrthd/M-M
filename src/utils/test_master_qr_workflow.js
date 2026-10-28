@@ -18,6 +18,8 @@ import {
 
 import { generateBulkQRLabelsPDF, generatePrintableHTML } from './qrLabelPDFExporter.js';
 import { generateSupabaseSQLBackup, generateJSONBackup } from '../services/supabaseBackup.js';
+import { buildQRScanUrl, parseScannedQRToken, PRODUCTION_DOMAIN, getAppBaseUrl } from './qrUrlHelper.js';
+import fs from 'fs';
 
 let passed = 0;
 let failed = 0;
@@ -90,6 +92,7 @@ export async function runMasterQRTests() {
     const pdfDoc = await generateBulkQRLabelsPDF(sampleRecords, { saveToFile: false });
     assert(pdfDoc !== null && typeof pdfDoc === 'object', 'jsPDF vector document created successfully');
   } catch (e) {
+    console.error('Stack trace:', e.stack);
     assert(false, `generateBulkQRLabelsPDF failed: ${e.message}`);
   }
 
@@ -255,6 +258,83 @@ export async function runMasterQRTests() {
   const jsonBackup = generateJSONBackup();
   assert(Array.isArray(jsonBackup.tables.qr_registry), 'JSON backup includes qr_registry table');
   assert(jsonBackup.tables.qr_registry.length > 0, `JSON backup exports all permanent QR records (${jsonBackup.tables.qr_registry.length})`);
+
+  // -------------------------------------------------------------
+  // MODULE 11: Production QR URL Payload, Universal Token Parsing & Dynamic Resolution
+  // -------------------------------------------------------------
+  console.log('\nTEST 7: Production QR URL Payload, Universal Token Parsing & SPA Routing');
+  
+  // 1. Production domain and URL structure validation
+  assert(PRODUCTION_DOMAIN === 'https://riyazrthd.github.io/M-M', 'Production domain matches deployed GitHub Pages URL');
+  const sampleToken = 'IFS-QR-000042';
+  const generatedUrl = buildQRScanUrl(sampleToken);
+  assert(generatedUrl === 'https://riyazrthd.github.io/M-M/qr/IFS-QR-000042', `Encoded QR payload matches exact required structure: ${generatedUrl}`);
+
+  // 2. Universal token parsing across mobile cameras, browsers, and query variants
+  const parsedDirectPath = parseScannedQRToken('https://riyazrthd.github.io/M-M/qr/IFS-QR-000042');
+  assert(parsedDirectPath === 'IFS-QR-000042', 'Parses direct path URL (/qr/TOKEN)');
+
+  const parsedTrailingSlash = parseScannedQRToken('https://riyazrthd.github.io/M-M/qr/IFS-QR-000042/');
+  assert(parsedTrailingSlash === 'IFS-QR-000042', 'Parses direct path with trailing slash (/qr/TOKEN/)');
+
+  const parsedUrlWithQuery = parseScannedQRToken('https://riyazrthd.github.io/M-M/qr/IFS-QR-000042?utm_source=camera&time=123');
+  assert(parsedUrlWithQuery === 'IFS-QR-000042', 'Parses direct path URL with query parameters');
+
+  const parsedQueryParam = parseScannedQRToken('https://riyazrthd.github.io/M-M/?qr=IFS-QR-000042');
+  assert(parsedQueryParam === 'IFS-QR-000042', 'Parses rewritten SPA query URL (?qr=TOKEN)');
+
+  const parsedLegacyScan = parseScannedQRToken('https://riyazrthd.github.io/M-M/?scan=IFS-QR-000042');
+  assert(parsedLegacyScan === 'IFS-QR-000042', 'Parses legacy query URL (?scan=TOKEN)');
+
+  const parsedHashUrl = parseScannedQRToken('https://riyazrthd.github.io/M-M/#/qr/IFS-QR-000042');
+  assert(parsedHashUrl === 'IFS-QR-000042', 'Parses hash-based URL (#/qr/TOKEN)');
+
+  const parsedRawToken = parseScannedQRToken('IFS-QR-000042');
+  assert(parsedRawToken === 'IFS-QR-000042', 'Handles raw token string without protocol');
+
+  const parsedPositionId = parseScannedQRToken('QR-POS-AIL-001');
+  assert(parsedPositionId === 'QR-POS-AIL-001', 'Handles legacy position QR code format');
+
+  // 3. Dynamic resolution: Full URL scanned by mobile camera
+  // Unassigned QR via full URL
+  const unassignedUrl = buildQRScanUrl(availableQR.token);
+  // availableQR was assigned in TEST 4, so let's pick another unassigned one from batch1
+  const unassignedSample = batch1.records[10];
+  const resolvedUnassignedFromUrl = resolveScannedAssetPosition(buildQRScanUrl(unassignedSample.token));
+  assert(resolvedUnassignedFromUrl !== null && resolvedUnassignedFromUrl.isUnassignedQR === true, 'Mobile camera scanning unassigned QR URL resolves to unassigned registration state');
+  assert(resolvedUnassignedFromUrl.qrRecord.token === unassignedSample.token, 'Token extracted accurately from mobile camera URL');
+
+  // Assigned QR via full URL
+  const registeredPosition = getPositions()[0];
+  // If registeredPosition has a QR code, test scanning full URL of that QR
+  const assignedUrl = buildQRScanUrl(registeredPosition.qrCode);
+  const resolvedAssignedFromUrl = resolveScannedAssetPosition(assignedUrl);
+  assert(resolvedAssignedFromUrl !== null && resolvedAssignedFromUrl.isUnassignedQR !== true, 'Mobile camera scanning assigned QR URL resolves directly to asset position');
+  assert(resolvedAssignedFromUrl.positionId === registeredPosition.positionId, 'Assigned asset position resolved accurately');
+
+  // Invalid or Unknown QR scan handling
+  const invalidScanResult = resolveScannedAssetPosition('https://riyazrthd.github.io/M-M/qr/NON-EXISTENT-TOKEN-999');
+  assert(invalidScanResult !== null && invalidScanResult.isInvalidQR === true, 'Scanning non-existent QR token returns isInvalidQR: true');
+  assert(invalidScanResult.error && invalidScanResult.error.length > 0, 'Returns descriptive error explanation for invalid QR');
+  assert(invalidScanResult.positionId === undefined, 'Does NOT fallback to dummy asset or random position');
+
+  // Retired QR scan handling
+  // Mark one record as Retired in the registry and persist to storage
+  const retiredSample = batch1.records[15];
+  const registryToRetire = getQRRegistry();
+  const targetToRetire = registryToRetire.find(r => r.token === retiredSample.token);
+  if (targetToRetire) {
+    targetToRetire.lifecycleStatus = 'Retired';
+    localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registryToRetire));
+  }
+  const retiredScanResult = resolveScannedAssetPosition(retiredSample.token);
+  assert(retiredScanResult !== null && retiredScanResult.isInvalidQR === true, 'Scanning retired QR returns isInvalidQR: true');
+  assert(retiredScanResult.isRetiredQR === true, 'Identifies retired QR token');
+
+  // 4. Verify 404.html SPA redirect handles /qr/ routing without losing tokens
+  const html404 = fs.readFileSync('404.html', 'utf8');
+  assert(html404.includes('/qr/') && (html404.includes('qrMatch') || html404.includes('qrRegex')), '404.html includes regex handler for /qr/ path');
+  assert(html404.includes('qr=') || html404.includes('?qr='), '404.html rewrites path to ?qr= parameter for SPA hydration');
 
   console.log('\n================================================================');
   console.log(` TOTAL TESTS: ${passed + failed}`);

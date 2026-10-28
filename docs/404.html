@@ -6,20 +6,43 @@
     <title>Indus Fire Safety — Loading</title>
     <script>
       (function() {
-        var search = window.location.search || '';
-        var hash = window.location.hash || '';
-        if (window.location.hostname.includes('github.io')) {
-          window.location.replace('/M-M/' + search + hash);
-        } else {
-          window.location.replace('./' + search + hash);
+        var l = window.location;
+        var pathname = l.pathname || '';
+        var search = l.search || '';
+        var hash = l.hash || '';
+
+        // Extract QR token from path like /M-M/qr/TOKEN or /qr/TOKEN
+        var qrMatch = pathname.match(/(?:\/qr\/|\/scan\/|\/pos\/|\/tag\/)([^\/\?\#]+)/i);
+        var base = l.hostname.includes('github.io') ? '/M-M/' : './';
+
+        if (qrMatch && qrMatch[1]) {
+          var token = decodeURIComponent(qrMatch[1]);
+          var cleanSearch = search.replace(/[\?&]qr=[^&]*/g, '').replace(/^&/, '?');
+          var sep = cleanSearch ? (cleanSearch.includes('?') ? '&' : '?') : '?';
+          l.replace(base + (cleanSearch || '') + sep + 'qr=' + encodeURIComponent(token) + hash);
+          return;
         }
+
+        // SPA redirect for other routes
+        var cleanPath = pathname.replace(/^\/M-M\/?/, '').replace(/^\/+/, '');
+        if (cleanPath && cleanPath !== 'index.html') {
+          var sep = search ? '&' : '?';
+          l.replace(base + search + sep + 'route=' + encodeURIComponent(cleanPath) + hash);
+          return;
+        }
+
+        l.replace(base + search + hash);
       })();
     </script>
   </head>
-  <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 80vh; text-align: center; color: #111827;">
-    <div>
-      <p style="font-weight: 600;">Redirecting to Indus Fire Safety Inspection System...</p>
-      <p><a href="/M-M/" style="color: #A80018; font-weight: 600;">Click here to open application</a></p>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 80vh; text-align: center; color: #111827; background: #F8FAFC;">
+    <div style="max-width: 400px; padding: 24px;">
+      <div style="width: 44px; height: 44px; border: 3px solid #E2E8F0; border-top-color: #DC2626; border-radius: 50%; margin: 0 auto 16px; animation: spin 0.8s linear infinite;"></div>
+      <p style="font-weight: 600; font-size: 15px; margin: 0 0 6px;">Opening Indus Fire Safety System...</p>
+      <p style="font-size: 13px; color: #64748B; margin: 0;">Resolving scanned QR code...</p>
     </div>
+    <style>
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
   </body>
 </html>

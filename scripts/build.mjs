@@ -17,6 +17,13 @@ const rootAssetsPath = path.resolve('assets');
 // 1. Ensure 404.html is in dist
 if (fs.existsSync('404.html')) {
   fs.copyFileSync('404.html', path.join(distPath, '404.html'));
+  
+  // Also create a qr/ fallback folder in dist
+  const distQrPath = path.join(distPath, 'qr');
+  if (!fs.existsSync(distQrPath)) {
+    fs.mkdirSync(distQrPath, { recursive: true });
+  }
+  fs.copyFileSync('404.html', path.join(distQrPath, 'index.html'));
 }
 
 // 2. Ensure dist has docs/ subfolder

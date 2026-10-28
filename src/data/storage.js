@@ -3,6 +3,7 @@
 
 import { DEMO_USERS, DEMO_SITES, DEMO_POSITIONS, DEMO_ACTIVE_VISIT } from './sampleData.js';
 import { INITIAL_TEMPLATE_MAPPINGS, INITIAL_EQUIPMENT_MASTER, resolveChecklistMapping } from './templateMappings.js';
+import { parseScannedQRToken } from '../utils/qrUrlHelper.js';
 
 export const STORAGE_KEYS = {
   CURRENT_USER: 'ifspl_amc_user',
@@ -369,24 +370,7 @@ export function getQRSequence() {
  */
 export function getQRRecordByToken(tokenOrCode) {
   if (!tokenOrCode || typeof tokenOrCode !== 'string') return null;
-  let clean = tokenOrCode.trim();
-
-  // Extract from full URL or query parameters if needed
-  try {
-    if (clean.includes('?') || clean.includes('&')) {
-      const queryPart = clean.split('?')[1] || clean;
-      const params = new URLSearchParams(queryPart);
-      clean = params.get('scan') || params.get('pos') || params.get('qr') || params.get('id') || clean;
-    }
-    if (clean.includes('#')) {
-      clean = clean.split('#')[1] || clean;
-    }
-    if (clean.includes('/') && (clean.startsWith('http://') || clean.startsWith('https://'))) {
-      const parts = clean.split('/').filter(Boolean);
-      clean = parts[parts.length - 1];
-    }
-  } catch (e) {}
-
+  const clean = parseScannedQRToken(tokenOrCode);
   const cleanUpper = clean.toUpperCase();
   const registry = getQRRegistry();
 
@@ -584,27 +568,7 @@ export function getQRRecordsForReprint(batchId = null, tokenList = null) {
 export function getPositionByQR(qrCode) {
   if (!qrCode || typeof qrCode !== 'string') return null;
   const positions = getPositions();
-  
-  let cleanCode = qrCode.trim();
-  // Extract token if a full URL or query string was scanned
-  try {
-    if (cleanCode.includes('?') || cleanCode.includes('&')) {
-      const queryPart = cleanCode.split('?')[1] || cleanCode;
-      const params = new URLSearchParams(queryPart);
-      cleanCode = params.get('scan') || params.get('pos') || params.get('id') || params.get('qr') || cleanCode;
-    }
-    if (cleanCode.includes('#')) {
-      cleanCode = cleanCode.split('#')[1] || cleanCode;
-    }
-    if (cleanCode.includes('/') && (cleanCode.startsWith('http://') || cleanCode.startsWith('https://'))) {
-      const parts = cleanCode.split('/').filter(Boolean);
-      const lastPart = parts[parts.length - 1];
-      if (lastPart && !lastPart.includes('.')) {
-        cleanCode = lastPart;
-      }
-    }
-  } catch (e) {}
-
+  const cleanCode = parseScannedQRToken(qrCode);
   const cleanUpper = cleanCode.trim().toUpperCase();
 
   // First check if this token is registered in the permanent QR registry and assigned to a position
@@ -638,37 +602,60 @@ export function getPositionByQR(qrCode) {
  */
 export function resolveScannedAssetPosition(scanCode, urlParams = null) {
   if (!scanCode) return null;
-  const match = getPositionByQR(scanCode);
+  const clean = parseScannedQRToken(scanCode);
+  if (!clean) return null;
+
+  // 1. Direct match with existing assigned asset
+  const match = getPositionByQR(clean);
   if (match) return match;
 
-  // Check if this is an unassigned QR code in the registry (Module 3: Step 1)
-  const qrRec = getQRRecordByToken(scanCode);
-  if (qrRec && qrRec.assignmentStatus === 'Available') {
-    return {
-      isUnassignedQR: true,
-      qrRecord: qrRec,
-      qrToken: qrRec.token,
-      displayNo: qrRec.displayNo,
-      seqNumber: qrRec.seqNumber
-    };
+  // 2. Check QR Registry
+  const qrRec = getQRRecordByToken(clean);
+  if (qrRec) {
+    if (qrRec.lifecycleStatus === 'Retired') {
+      return {
+        isInvalidQR: true,
+        isRetiredQR: true,
+        scanCode: clean,
+        qrRecord: qrRec,
+        error: `QR Code "${qrRec.displayNo}" (${qrRec.token}) has been retired and is no longer active in the system.`
+      };
+    }
+
+    if (qrRec.assignmentStatus === 'Available') {
+      return {
+        isUnassignedQR: true,
+        qrRecord: qrRec,
+        qrToken: qrRec.token,
+        displayNo: qrRec.displayNo,
+        seqNumber: qrRec.seqNumber
+      };
+    }
+
+    if (qrRec.assignmentStatus === 'Assigned' && qrRec.linkedPositionId) {
+      const positions = getPositions();
+      const linked = positions.find(p => p.positionId === qrRec.linkedPositionId || p.qrCode === qrRec.token);
+      if (linked) return linked;
+    }
   }
 
+  // 3. Fallback strictly for explicit legacy query URLs that carried full metadata
   try {
     const params = urlParams || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null);
-    if (params) {
+    if (params && params.get('tmpl') && (params.get('sn') || params.get('eq'))) {
       const tmpl = params.get('tmpl') || 'CL-11';
       const eq = params.get('eq') || 'Fire Safety Equipment';
       const client = params.get('client') || 'Client Organisation';
       const loc = params.get('loc') || 'Plant Area';
-      const sn = params.get('sn') || scanCode;
+      const sn = params.get('sn') || clean;
       const cap = params.get('cap') || '';
 
       const constructed = {
-        id: `pos-${scanCode.toLowerCase()}`,
-        positionId: scanCode,
-        permanentPositionCode: scanCode,
-        qrCode: scanCode.startsWith('IFS-QR-') ? scanCode : `IFS-QR-${scanCode}`,
-        qrToken: scanCode.startsWith('IFS-QR-') ? scanCode : `IFS-QR-${scanCode}`,
+        id: `pos-${clean.toLowerCase()}`,
+        positionId: clean,
+        permanentPositionCode: clean,
+        qrCode: clean.startsWith('IFS-QR-') ? clean : `IFS-QR-${clean}`,
+        qrToken: clean.startsWith('IFS-QR-') ? clean : `IFS-QR-${clean}`,
         siteId: 'SITE-AIL-001',
         siteName: client,
         clientName: client,
@@ -682,7 +669,7 @@ export function resolveScannedAssetPosition(scanCode, urlParams = null) {
         activeUnitId: sn,
         currentEquipment: {
           id: sn,
-          assetPositionId: scanCode,
+          assetPositionId: clean,
           serialNo: sn,
           serialNumber: sn,
           make: 'Indus SafeGuard',
@@ -699,7 +686,7 @@ export function resolveScannedAssetPosition(scanCode, urlParams = null) {
       };
 
       const positions = getPositions();
-      const exists = positions.find(p => p.positionId === scanCode);
+      const exists = positions.find(p => p.positionId === clean);
       if (!exists) {
         positions.push(constructed);
         localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
@@ -710,7 +697,12 @@ export function resolveScannedAssetPosition(scanCode, urlParams = null) {
     console.warn('resolveScannedAssetPosition error:', e);
   }
 
-  return null;
+  // 4. Token is not found in database or registry -> Return explicit invalid QR state
+  return {
+    isInvalidQR: true,
+    scanCode: clean,
+    error: `QR Code "${clean}" is not recognized in the database or permanent registry.`
+  };
 }
 
 

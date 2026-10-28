@@ -16,7 +16,12 @@ global.window = {
   dispatchEvent() {},
   atob: atobPolyfill,
   btoa: btoaPolyfill,
-  location: { search: '', pathname: '/' },
+  location: { 
+    origin: 'https://riyazrthd.github.io', 
+    hostname: 'riyazrthd.github.io', 
+    search: '', 
+    pathname: '/M-M/' 
+  },
   open: () => ({ document: { write() {}, close() {} }, focus() {} }),
   document: { createElement: () => ({ setAttribute() {}, appendChild() {}, click() {} }) }
 };

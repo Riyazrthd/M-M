@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getPositions, getPositionByQR, getQRRecordByToken } from '../data/storage';
+import { getPositions, getPositionByQR, getQRRecordByToken, resolveScannedAssetPosition } from '../data/storage';
+import { parseScannedQRToken } from '../utils/qrUrlHelper';
 import { 
   QrCode, 
   Search, 
@@ -97,37 +98,40 @@ export default function QRScannerScreen({ onNavigate, onSelectPosition, activeSi
   }, []);
 
   const handleScanCode = (codeToScan) => {
-    const code = (codeToScan || manualCode).trim();
-    if (!code) {
+    const raw = (codeToScan || manualCode || '').trim();
+    if (!raw) {
       setScanError('Please enter or scan a valid QR code or Position ID');
       setScannedResult(null);
       return;
     }
 
-    const match = getPositionByQR(code);
-    if (match) {
-      setScannedResult(match);
+    const cleanCode = parseScannedQRToken(raw);
+    const resolved = resolveScannedAssetPosition(cleanCode);
+
+    // Case 1: Unassigned pre-printed QR code -> route directly to registration
+    if (resolved && resolved.isUnassignedQR) {
+      setScanError('');
+      setUnknownCode('');
+      setScannedResult(null);
+      onNavigate('asset-register', { prefilledQR: resolved.qrRecord });
+      return;
+    }
+
+    // Case 2: Existing assigned asset -> directly open checklist
+    if (resolved && resolved.positionId) {
+      setScannedResult(resolved);
       setScanError('');
       setUnknownCode('');
       if (onSelectPosition) {
-        onSelectPosition(match);
+        onSelectPosition(resolved);
       }
-      // Direct opening of the mapped digital checklist
       onNavigate('digital-checklist');
       return;
     }
 
-    // Check if this is an unassigned QR code from the permanent registry (Module 3)
-    const qrRec = getQRRecordByToken(code);
-    if (qrRec && qrRec.assignmentStatus === 'Available') {
-      setScanError('');
-      setUnknownCode('');
-      onNavigate('asset-register', { prefilledQR: qrRec });
-      return;
-    }
-
-    setScanError(`Asset not found: No equipment position registered for code "${code}".`);
-    setUnknownCode(code);
+    // Case 3: Invalid or retired QR code
+    setScanError(resolved?.error || `Asset not found: No equipment position registered for code "${cleanCode}".`);
+    setUnknownCode(cleanCode);
     setScannedResult(null);
   };
 
