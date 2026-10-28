@@ -100,9 +100,9 @@ export default function Sidebar({
       <aside 
         className={`app-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
         style={{
-          width: isCollapsed ? '68px' : '240px',
-          minWidth: isCollapsed ? '68px' : '240px',
-          maxWidth: isCollapsed ? '68px' : '240px',
+          width: isCollapsed ? '68px' : '268px',
+          minWidth: isCollapsed ? '68px' : '268px',
+          maxWidth: isCollapsed ? '68px' : '268px',
           flexShrink: 0,
           backgroundColor: '#F7F8F9',
           borderRight: '1px solid #E1E5E9',
@@ -124,8 +124,8 @@ export default function Sidebar({
             left: 0,
             top: 0,
             bottom: 0,
-            width: '260px',
-            maxWidth: '260px',
+            width: '280px',
+            maxWidth: '280px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           } : {})
         }}
@@ -273,10 +273,11 @@ export default function Sidebar({
                         alignItems: 'center',
                         justifyContent: isCollapsed ? 'center' : 'space-between',
                         fontWeight: isActive ? 600 : 400,
-                        fontSize: '13.5px',
+                        fontSize: '13px',
                         transition: 'all 0.12s ease',
                         border: 'none',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxSizing: 'border-box'
                       }}
                       onMouseEnter={(e) => {
                         if (!isActive) {
@@ -291,25 +292,45 @@ export default function Sidebar({
                         }
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '9px',
+                        minWidth: 0,
+                        flex: 1,
+                        overflow: 'hidden'
+                      }}>
                         <Icon 
                           size={18} 
                           color={isActive ? '#17191C' : '#536174'} 
-                          strokeWidth={isActive ? 2.1 : 1.8} 
+                          strokeWidth={isActive ? 2.1 : 1.8}
+                          style={{ flexShrink: 0 }}
                         />
                         {!isCollapsed && (
-                          <span style={{ whiteSpace: 'nowrap' }}>{item.label}</span>
+                          <span style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            letterSpacing: '-0.01em',
+                            textAlign: 'left'
+                          }}>
+                            {item.label}
+                          </span>
                         )}
                       </div>
 
                       {!isCollapsed && item.badge && (
                         <span style={{
-                          fontSize: '0.65rem',
-                          padding: '1px 5px',
+                          fontSize: '10px',
+                          lineHeight: '1',
+                          padding: '2.5px 6px',
                           borderRadius: '4px',
                           backgroundColor: '#DC2626',
                           color: '#FFFFFF',
-                          fontWeight: 700
+                          fontWeight: 700,
+                          letterSpacing: '0.02em',
+                          flexShrink: 0,
+                          marginLeft: '8px'
                         }}>
                           {item.badge}
                         </span>
@@ -376,7 +397,9 @@ export default function Sidebar({
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
-              marginBottom: '6px'
+              marginBottom: '6px',
+              boxSizing: 'border-box',
+              overflow: 'hidden'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#DCFCE7';
@@ -392,8 +415,8 @@ export default function Sidebar({
               backgroundColor: '#00875A',
               flexShrink: 0
             }} />
-            <Cloud size={15} color="#00875A" />
-            {!isCollapsed && <span>Supabase Cloud</span>}
+            <Cloud size={15} color="#00875A" style={{ flexShrink: 0 }} />
+            {!isCollapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Supabase Cloud</span>}
           </button>
 
           {/* Equipment & Linked Services Master Shortcut */}
@@ -418,7 +441,9 @@ export default function Sidebar({
               fontWeight: 600,
               border: 'none',
               cursor: 'pointer',
-              marginBottom: '4px'
+              marginBottom: '4px',
+              boxSizing: 'border-box',
+              overflow: 'hidden'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#E8E9EA';
@@ -427,8 +452,8 @@ export default function Sidebar({
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <Sliders size={16} />
-            {!isCollapsed && <span>Equipment Master</span>}
+            <Sliders size={16} style={{ flexShrink: 0 }} />
+            {!isCollapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Equipment Master</span>}
           </button>
 
           {/* Settings Shortcut */}
@@ -453,7 +478,9 @@ export default function Sidebar({
               fontWeight: 500,
               border: 'none',
               cursor: 'pointer',
-              marginBottom: '6px'
+              marginBottom: '6px',
+              boxSizing: 'border-box',
+              overflow: 'hidden'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#E8E9EA';
@@ -464,8 +491,8 @@ export default function Sidebar({
               e.currentTarget.style.color = '#536174';
             }}
           >
-            <Sliders size={16} />
-            {!isCollapsed && <span>Template Mappings</span>}
+            <Sliders size={16} style={{ flexShrink: 0 }} />
+            {!isCollapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Template Mappings</span>}
           </button>
 
           {/* User Profile Box */}
@@ -480,10 +507,12 @@ export default function Sidebar({
               alignItems: 'center',
               justifyContent: isCollapsed ? 'center' : 'space-between',
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+              boxSizing: 'border-box',
+              overflow: 'hidden'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', minWidth: 0, flex: 1 }}>
               <div style={{
                 width: '28px',
                 height: '28px',
@@ -500,11 +529,11 @@ export default function Sidebar({
                 {user.name.charAt(0)}
               </div>
               {!isCollapsed && (
-                <div style={{ overflow: 'hidden' }}>
+                <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#17191C', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                     {user.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#788494', textTransform: 'capitalize' }}>
+                  <div style={{ fontSize: '11px', color: '#788494', textTransform: 'capitalize', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                     {user.role === 'technician' ? 'Field Engineer' : user.role === 'manager' ? 'Technical Manager' : 'Client Auditor'}
                   </div>
                 </div>
@@ -512,7 +541,7 @@ export default function Sidebar({
             </div>
 
             {!isCollapsed && (
-              <ChevronDown size={14} color="#788494" />
+              <ChevronDown size={14} color="#788494" style={{ flexShrink: 0, marginLeft: '4px' }} />
             )}
           </div>
 
