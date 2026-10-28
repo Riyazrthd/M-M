@@ -41,6 +41,9 @@ async function runAllTests() {
   console.log('\n\n');
   const extinguisherTests = await import('./src/utils/test_fire_extinguisher_inventory.js');
   await extinguisherTests.runFireExtinguisherInventoryTests();
+  console.log('\n\n');
+  const allAssetsTests = await import('./src/utils/test_all_assets_inventory.js');
+  await allAssetsTests.runAllAssetsInventoryTests();
 }
 
 runAllTests();

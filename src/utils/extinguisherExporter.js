@@ -2,11 +2,13 @@ import ExcelJS from 'exceljs';
 import { COMPANY_INFO } from '../data/checklistTemplates.js';
 
 /**
- * Generates and downloads a CSV export of fire extinguishers for a client
+ * Generates and downloads a CSV export of registered assets (all categories or filtered) for a client
  */
-export function downloadClientExtinguishersCSV({ clientName, siteName, extinguishers = [] }) {
+export function downloadClientAssetsCSV({ clientName, siteName, assets = [], reportTitle = 'ALL REGISTERED ASSET INVENTORY' }) {
   const safeClient = clientName || 'Client';
-  const headers = [
+  const isExtinguisher = reportTitle.toLowerCase().includes('extinguisher');
+
+  const headers = isExtinguisher ? [
     'SR. No.',
     'Asset ID',
     'QR Number',
@@ -21,6 +23,22 @@ export function downloadClientExtinguishersCSV({ clientName, siteName, extinguis
     'Last Inspection Date',
     'Next Inspection Due',
     'Asset Status'
+  ] : [
+    'SR. No.',
+    'Asset ID',
+    'QR Number',
+    'Client Name',
+    'Site / Plant Name',
+    'Location / Position',
+    'Equipment Category',
+    'Equipment Type',
+    'Capacity / Specification',
+    'Make / Manufacturer',
+    'Serial Number',
+    'Installation Date',
+    'Last Inspection Date',
+    'Next Inspection Due',
+    'Asset Status'
   ];
 
   const escapeCSV = (val) => {
@@ -29,8 +47,37 @@ export function downloadClientExtinguishersCSV({ clientName, siteName, extinguis
     return `"${str}"`;
   };
 
-  const rows = extinguishers.map((pos, idx) => {
+  const rows = assets.map((pos, idx) => {
     const loc = [pos.area, pos.locationDescription || pos.location].filter(Boolean).join(' — ') || 'Facility Area';
+    const extType = pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher';
+    const cap = pos.currentEquipment?.capacity || pos.capacity || '—';
+    const make = pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard';
+    const serial = pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—';
+    const instDate = pos.currentEquipment?.installationDate || pos.installationDate || '—';
+    const lastInsp = pos.lastInspectionDate || pos.inspectionHistory?.[0]?.inspectionDate || '—';
+    const nextDue = pos.currentEquipment?.nextServiceDueDate || pos.currentEquipment?.nextHydroTestDue || pos.nextInspectionDueDate || '—';
+    const status = pos.inspectionStatus || pos.operationalStatus || pos.status || 'Active';
+
+    if (isExtinguisher) {
+      return [
+        escapeCSV(idx + 1),
+        escapeCSV(pos.positionId || pos.id),
+        escapeCSV(pos.qrCode || pos.qrToken || '—'),
+        escapeCSV(pos.clientName || clientName || 'Client Organisation'),
+        escapeCSV(pos.siteName || siteName || 'Plant Facility'),
+        escapeCSV(loc),
+        escapeCSV(extType),
+        escapeCSV(cap),
+        escapeCSV(make),
+        escapeCSV(serial),
+        escapeCSV(instDate),
+        escapeCSV(lastInsp),
+        escapeCSV(nextDue),
+        escapeCSV(status)
+      ].join(',');
+    }
+
+    const category = pos.equipmentCategory || (pos.templateId === 'CL-03' ? 'Delivery Hose Box' : (pos.templateId === 'CL-11' ? 'Fire Extinguisher' : pos.equipmentType || 'Safety Equipment'));
     return [
       escapeCSV(idx + 1),
       escapeCSV(pos.positionId || pos.id),
@@ -38,27 +85,28 @@ export function downloadClientExtinguishersCSV({ clientName, siteName, extinguis
       escapeCSV(pos.clientName || clientName || 'Client Organisation'),
       escapeCSV(pos.siteName || siteName || 'Plant Facility'),
       escapeCSV(loc),
-      escapeCSV(pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher'),
+      escapeCSV(category),
+      escapeCSV(pos.currentEquipment?.type || pos.equipmentType || category),
       escapeCSV(pos.currentEquipment?.capacity || '—'),
-      escapeCSV(pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard'),
-      escapeCSV(pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—'),
-      escapeCSV(pos.currentEquipment?.installationDate || pos.installationDate || '—'),
-      escapeCSV(pos.lastInspectionDate || pos.inspectionHistory?.[0]?.inspectionDate || '—'),
-      escapeCSV(pos.currentEquipment?.nextServiceDueDate || pos.currentEquipment?.nextHydroTestDue || pos.nextInspectionDueDate || '—'),
-      escapeCSV(pos.inspectionStatus || pos.operationalStatus || pos.status || 'Active')
+      escapeCSV(make),
+      escapeCSV(serial),
+      escapeCSV(instDate),
+      escapeCSV(lastInsp),
+      escapeCSV(nextDue),
+      escapeCSV(status)
     ].join(',');
   });
 
   const metadataLines = [
-    `# INDUS FIRE SAFETY PRIVATE LIMITED — REGISTERED FIRE EXTINGUISHER INVENTORY`,
+    `# INDUS FIRE SAFETY PRIVATE LIMITED — ${reportTitle.toUpperCase()}`,
     `# Client: ${safeClient}`,
-    `# Total Extinguishers: ${extinguishers.length}`,
+    `# Total Assets: ${assets.length}`,
     `# Export Date: ${new Date().toLocaleString()}`,
     ``
   ];
 
   const csvContent = '\uFEFF' + metadataLines.join('\n') + headers.join(',') + '\n' + rows.join('\n');
-  const filename = `Fire_Extinguishers_${safeClient.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().substring(0, 10)}.csv`;
+  const filename = `${reportTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${safeClient.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().substring(0, 10)}.csv`;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof Blob !== 'undefined') {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -72,24 +120,36 @@ export function downloadClientExtinguishersCSV({ clientName, siteName, extinguis
     URL.revokeObjectURL(url);
   }
 
-  return { success: true, filename, count: extinguishers.length, csvContent };
+  return { success: true, filename, count: assets.length, csvContent };
 }
 
 /**
- * Generates and downloads a formatted Excel (.xlsx) file containing fire extinguishers for a client
+ * Backward compatible wrapper for fire extinguisher CSV download
  */
-export async function downloadClientExtinguishersExcel({ clientName, siteName, extinguishers = [] }) {
+export function downloadClientExtinguishersCSV({ clientName, siteName, extinguishers = [] }) {
+  return downloadClientAssetsCSV({
+    clientName,
+    siteName,
+    assets: extinguishers,
+    reportTitle: 'Fire_Extinguishers'
+  });
+}
+
+/**
+ * Generates and downloads a formatted Excel (.xlsx) file containing all registered assets for a client
+ */
+export async function downloadClientAssetsExcel({ clientName, siteName, assets = [], reportTitle = 'ALL REGISTERED ASSET INVENTORY' }) {
   const safeClient = clientName || 'Client';
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Indus Fire Safety Private Limited';
   workbook.created = new Date();
 
-  const worksheet = workbook.addWorksheet('Extinguisher Inventory', {
+  const worksheet = workbook.addWorksheet('Asset Inventory', {
     views: [{ showGridLines: true }]
   });
 
   // 1. Company Header Banner
-  worksheet.mergeCells('A1:N1');
+  worksheet.mergeCells('A1:O1');
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'INDUS FIRE SAFETY PRIVATE LIMITED';
   titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -97,10 +157,10 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(1).height = 28;
 
-  worksheet.mergeCells('A2:N2');
+  worksheet.mergeCells('A2:O2');
   const subTitleCell = worksheet.getCell('A2');
-  subTitleCell.value = 'FIRE EXTINGUISHER ASSET INVENTORY & COMPLIANCE DOSSIER';
-  subTitleCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFDC2626' } }; // Crimson
+  subTitleCell.value = `${reportTitle.toUpperCase()} — COMPLIANCE & ASSET DOSSIER`;
+  subTitleCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFDC2626' } };
   subTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
   subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(2).height = 20;
@@ -109,7 +169,7 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
   worksheet.getCell('A4').value = 'Client Name:';
   worksheet.getCell('B4').value = safeClient;
   worksheet.getCell('G4').value = 'Total Quantity:';
-  worksheet.getCell('H4').value = `${extinguishers.length} Registered Extinguishers`;
+  worksheet.getCell('H4').value = `${assets.length} Registered Units`;
 
   worksheet.getCell('A5').value = 'Facility / Site:';
   worksheet.getCell('B5').value = siteName || 'All Contracted Plants';
@@ -131,8 +191,9 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
     { header: 'Client Name', key: 'clientName', width: 24 },
     { header: 'Site / Plant Name', key: 'siteName', width: 26 },
     { header: 'Location / Position', key: 'location', width: 32 },
-    { header: 'Extinguisher Type', key: 'type', width: 28 },
-    { header: 'Capacity', key: 'capacity', width: 12 },
+    { header: 'Equipment Category', key: 'category', width: 22 },
+    { header: 'Equipment Type', key: 'type', width: 28 },
+    { header: 'Capacity / Rating', key: 'capacity', width: 14 },
     { header: 'Make / Manufacturer', key: 'make', width: 22 },
     { header: 'Serial Number', key: 'serialNumber', width: 20 },
     { header: 'Installation Date', key: 'installationDate', width: 16 },
@@ -161,12 +222,14 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
   });
 
   // 4. Data Rows
-  extinguishers.forEach((pos, idx) => {
+  assets.forEach((pos, idx) => {
     const rowIdx = headerRowIdx + 1 + idx;
     const row = worksheet.getRow(rowIdx);
     row.height = 20;
 
     const loc = [pos.area, pos.locationDescription || pos.location].filter(Boolean).join(' — ') || 'Facility Area';
+    const category = pos.equipmentCategory || (pos.templateId === 'CL-03' ? 'Delivery Hose Box' : (pos.templateId === 'CL-11' ? 'Fire Extinguisher' : pos.equipmentType || 'Safety Equipment'));
+
     const rowData = [
       idx + 1,
       pos.positionId || pos.id,
@@ -174,7 +237,8 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
       pos.clientName || clientName || 'Client Organisation',
       pos.siteName || siteName || 'Plant Facility',
       loc,
-      pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher',
+      category,
+      pos.currentEquipment?.type || pos.equipmentType || category,
       pos.currentEquipment?.capacity || '—',
       pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard',
       pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—',
@@ -189,7 +253,7 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
       cell.value = val;
       cell.font = { name: 'Arial', size: 8.5 };
       cell.alignment = {
-        horizontal: cIdx === 0 || cIdx === 7 ? 'center' : (cIdx === 1 || cIdx === 2 || cIdx === 9 || cIdx === 10 || cIdx === 11 || cIdx === 12 || cIdx === 13) ? 'center' : 'left',
+        horizontal: cIdx === 0 || cIdx === 8 ? 'center' : (cIdx === 1 || cIdx === 2 || cIdx === 10 || cIdx === 11 || cIdx === 12 || cIdx === 13 || cIdx === 14) ? 'center' : 'left',
         vertical: 'middle'
       };
       cell.fill = {
@@ -207,7 +271,7 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
   });
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `Fire_Extinguishers_${safeClient.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().substring(0, 10)}.xlsx`;
+  const filename = `${reportTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${safeClient.replace(/[^a-zA-Z0-9_-]/g, '_')}_${new Date().toISOString().substring(0, 10)}.xlsx`;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof Blob !== 'undefined') {
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -221,13 +285,25 @@ export async function downloadClientExtinguishersExcel({ clientName, siteName, e
     URL.revokeObjectURL(url);
   }
 
-  return { success: true, filename, count: extinguishers.length };
+  return { success: true, filename, count: assets.length };
 }
 
 /**
- * Triggers clean browser print for the complete extinguisher inventory
+ * Backward compatible wrapper for fire extinguisher Excel download
  */
-export function printClientExtinguishersReport({ clientName, siteName, extinguishers = [] }) {
+export async function downloadClientExtinguishersExcel({ clientName, siteName, extinguishers = [] }) {
+  return downloadClientAssetsExcel({
+    clientName,
+    siteName,
+    assets: extinguishers,
+    reportTitle: 'Fire_Extinguishers'
+  });
+}
+
+/**
+ * Triggers clean browser print for the complete registered asset inventory
+ */
+export function printClientAssetsReport({ clientName, siteName, assets = [], reportTitle = 'ALL REGISTERED ASSET INVENTORY' }) {
   if (typeof window === 'undefined') return;
 
   const printWindow = window.open('', '_blank');
@@ -237,14 +313,16 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
   }
 
   const safeClient = clientName || 'Client Organisation';
-  const tableRows = extinguishers.map((pos, idx) => {
+  const tableRows = assets.map((pos, idx) => {
     const loc = [pos.area, pos.locationDescription || pos.location].filter(Boolean).join(' — ') || 'Facility Area';
+    const category = pos.equipmentCategory || (pos.templateId === 'CL-03' ? 'Delivery Hose Box' : (pos.templateId === 'CL-11' ? 'Fire Extinguisher' : pos.equipmentType || 'Safety Equipment'));
     return `
       <tr>
         <td style="text-align:center;">${idx + 1}</td>
         <td><strong>${pos.positionId || pos.id}</strong></td>
         <td><code>${pos.qrCode || pos.qrToken || '—'}</code></td>
-        <td>${pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher'}</td>
+        <td>${category}</td>
+        <td>${pos.currentEquipment?.type || pos.equipmentType || category}</td>
         <td style="text-align:center;">${pos.currentEquipment?.capacity || '—'}</td>
         <td>${pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard'}</td>
         <td><code>${pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—'}</code></td>
@@ -260,7 +338,7 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Fire Extinguisher Inventory — ${safeClient}</title>
+        <title>${reportTitle} — ${safeClient}</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #0F172A; }
           .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0B6B63; padding-bottom: 12px; margin-bottom: 16px; }
@@ -269,7 +347,7 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
           .report-title { font-size: 15px; font-weight: 700; color: #0B6B63; text-align: right; }
           .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; }
           .meta-item strong { color: #475569; font-size: 11px; display: block; text-transform: uppercase; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
           th { background-color: #0F172A; color: white; padding: 6px 8px; font-weight: 600; text-align: left; }
           td { padding: 6px 8px; border-bottom: 1px solid #E2E8F0; }
           tr:nth-child(even) { background-color: #F8FAFC; }
@@ -284,10 +362,10 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
         <div class="header">
           <div>
             <div class="company-title">INDUS FIRE SAFETY PRIVATE LIMITED</div>
-            <div class="sub">Comprehensive AMC Fire Extinguisher Asset Inventory & Inspection Record</div>
+            <div class="sub">Comprehensive AMC Fire & Safety Asset Inventory & Inspection Record</div>
           </div>
           <div>
-            <div class="report-title">REGISTERED EXTINGUISHER INVENTORY</div>
+            <div class="report-title">${reportTitle.toUpperCase()}</div>
             <div class="sub" style="text-align: right;">Generated: ${new Date().toLocaleString()}</div>
           </div>
         </div>
@@ -302,12 +380,12 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
             <div>${siteName || 'All Contracted Plants'}</div>
           </div>
           <div class="meta-item">
-            <strong>Total Extinguishers</strong>
-            <div style="font-weight: 700; color: #0B6B63;">${extinguishers.length} Registered Units</div>
+            <strong>Total Assets</strong>
+            <div style="font-weight: 700; color: #0B6B63;">${assets.length} Registered Units</div>
           </div>
           <div class="meta-item">
-            <strong>Compliance Standard</strong>
-            <div>IS 2190 / IS 15683 Proof Tested</div>
+            <strong>Compliance Status</strong>
+            <div>Verified AMC Asset Dossier</div>
           </div>
         </div>
 
@@ -317,8 +395,9 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
               <th style="text-align:center;">#</th>
               <th>Asset ID</th>
               <th>QR Code</th>
-              <th>Type</th>
-              <th style="text-align:center;">Cap.</th>
+              <th>Category</th>
+              <th>Equipment Type</th>
+              <th style="text-align:center;">Cap. / Spec</th>
               <th>Make</th>
               <th>Serial No.</th>
               <th>Location</th>
@@ -347,4 +426,16 @@ export function printClientExtinguishersReport({ clientName, siteName, extinguis
     printWindow.focus();
     printWindow.print();
   }, 250);
+}
+
+/**
+ * Backward compatible wrapper for fire extinguisher print
+ */
+export function printClientExtinguishersReport({ clientName, siteName, extinguishers = [] }) {
+  return printClientAssetsReport({
+    clientName,
+    siteName,
+    assets: extinguishers,
+    reportTitle: 'Fire Extinguisher Inventory'
+  });
 }

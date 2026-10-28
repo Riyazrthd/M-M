@@ -566,6 +566,124 @@ export function getClientExtinguisherBreakdown() {
 }
 
 // ============================================================================
+// ALL ASSET INVENTORY & CLIENT BREAKDOWN QUERY HELPERS (ALL ASSET CATEGORIES)
+// ============================================================================
+
+/**
+ * Returns all valid registered assets across all categories (or filtered by category and/or client/site).
+ * Strictly excludes retired or scrapped assets and unassigned QR labels.
+ */
+export function getRegisteredAssets(clientIdOrSiteId = null, categoryFilter = null) {
+  const positions = getPositions();
+  const sites = getSites();
+
+  let filtered = positions.filter(p => {
+    if (!p) return false;
+    if (p.status === 'Retired' || p.status === 'Deleted' || p.operationalStatus === 'Retired' || p.operationalStatus === 'Scrapped') {
+      return false;
+    }
+    if (!p.positionId && !p.id) return false;
+    return true;
+  });
+
+  if (categoryFilter && categoryFilter !== 'ALL') {
+    if (categoryFilter === 'EXTINGUISHER' || categoryFilter === 'Fire Extinguisher') {
+      filtered = filtered.filter(isFireExtinguisherAsset);
+    } else {
+      const catLower = categoryFilter.toLowerCase();
+      filtered = filtered.filter(p => {
+        const c = (p.equipmentCategory || '').toLowerCase();
+        const t = (p.equipmentType || '').toLowerCase();
+        const tmpl = (p.templateId || '').toLowerCase();
+        return c.includes(catLower) || t.includes(catLower) || tmpl.includes(catLower);
+      });
+    }
+  }
+
+  if (clientIdOrSiteId) {
+    filtered = filtered.filter(p => {
+      if (p.siteId === clientIdOrSiteId) return true;
+      const s = sites.find(site => site.id === p.siteId || site.code === p.siteId);
+      const cName = s?.clientName || s?.company || s?.name || p.clientName;
+      return cName === clientIdOrSiteId || s?.id === clientIdOrSiteId;
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Returns total count of all registered assets (or filtered by category)
+ */
+export function getTotalAssetsCount(categoryFilter = null) {
+  return getRegisteredAssets(null, categoryFilter).length;
+}
+
+/**
+ * Returns client-wise aggregated breakdown of ALL assets (or filtered by category):
+ * [ { clientName, siteId, siteName, totalAssets, assets, categoriesBreakdown, typesBreakdown, inspectedCount, attentionCount, pendingCount } ]
+ */
+export function getClientAssetBreakdown(categoryFilter = null) {
+  const assets = getRegisteredAssets(null, categoryFilter);
+  const sites = getSites();
+
+  const clientMap = {};
+
+  assets.forEach(asset => {
+    const s = sites.find(site => site.id === asset.siteId || site.code === asset.siteId);
+    const clientKey = s?.clientName || s?.company || s?.name || asset.clientName || 'Unassigned Client';
+    const siteTitle = s?.plantFacility || s?.name || asset.siteName || asset.siteId || 'Main Facility';
+    
+    if (!clientMap[clientKey]) {
+      clientMap[clientKey] = {
+        clientName: clientKey,
+        siteId: asset.siteId,
+        siteName: siteTitle,
+        siteAddress: s?.address || asset.siteAddress || '',
+        city: s?.city || asset.city || '',
+        totalAssets: 0,
+        assets: [],
+        categoriesBreakdown: {},
+        typesBreakdown: {},
+        inspectedCount: 0,
+        attentionCount: 0,
+        pendingCount: 0
+      };
+    }
+
+    clientMap[clientKey].totalAssets++;
+    clientMap[clientKey].assets.push(asset);
+
+    // Track category breakdown
+    const catLabel = asset.equipmentCategory || (asset.templateId === 'CL-03' ? 'Delivery Hose Box' : (asset.templateId === 'CL-11' ? 'Fire Extinguisher' : asset.equipmentType || 'Safety Equipment'));
+    clientMap[clientKey].categoriesBreakdown[catLabel] = (clientMap[clientKey].categoriesBreakdown[catLabel] || 0) + 1;
+
+    // Track specific type breakdown
+    const typeLabel = asset.currentEquipment?.type || asset.equipmentType || catLabel;
+    clientMap[clientKey].typesBreakdown[typeLabel] = (clientMap[clientKey].typesBreakdown[typeLabel] || 0) + 1;
+
+    // Track inspection status
+    if (asset.inspectionStatus === 'Inspected - OK') {
+      clientMap[clientKey].inspectedCount++;
+    } else if (asset.inspectionStatus === 'Inspected - Attention') {
+      clientMap[clientKey].attentionCount++;
+    } else {
+      clientMap[clientKey].pendingCount++;
+    }
+  });
+
+  return Object.values(clientMap).map(c => ({
+    ...c,
+    categories: Object.keys(c.categoriesBreakdown),
+    statusCounts: {
+      ok: c.inspectedCount,
+      attn: c.attentionCount,
+      pending: c.pendingCount
+    }
+  })).sort((a, b) => b.totalAssets - a.totalAssets);
+}
+
+// ============================================================================
 // PERMANENT QR REGISTRY & BULK GENERATION MODULE (Modules 1, 2, 3)
 // Concurrency-safe, duplicate-free, permanent registry of all QR tokens
 // ============================================================================

@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { 
   getSites, getPositions, getVisits, getCurrentUser, getQRRegistry, 
   getPendingAssetsForSite, VALID_PENDING_REASONS,
-  isFireExtinguisherAsset, getRegisteredExtinguishers, getTotalExtinguishersCount, getClientExtinguisherBreakdown
+  isFireExtinguisherAsset, getRegisteredExtinguishers, getTotalExtinguishersCount, getClientExtinguisherBreakdown,
+  getRegisteredAssets, getTotalAssetsCount, getClientAssetBreakdown
 } from '../data/storage';
 import { downloadMasterWorkbookExcel } from '../utils/checklistExporter';
 import { downloadPendingAssetsExcel, downloadPendingAssetsCSV } from '../utils/pendingAssetExporter';
-import { downloadClientExtinguishersCSV, downloadClientExtinguishersExcel, printClientExtinguishersReport } from '../utils/extinguisherExporter';
+import { 
+  downloadClientExtinguishersCSV, downloadClientExtinguishersExcel, printClientExtinguishersReport,
+  downloadClientAssetsCSV, downloadClientAssetsExcel, printClientAssetsReport
+} from '../utils/extinguisherExporter';
 import { downloadSQLBackupFile } from '../services/supabaseBackup';
 import { 
   Building2, ShieldCheck, AlertTriangle, Calendar, CheckCircle2, 
   TrendingUp, TrendingDown, FileCheck, ArrowRight, ArrowUpRight, BarChart3,
-  ExternalLink, Search, Download, PlusCircle, QrCode, Flame, FireExtinguisher,
+  ExternalLink, Search, Download, PlusCircle, QrCode, Flame, FireExtinguisher, Layers,
   Clock, ChevronRight, Sparkles, FileSpreadsheet, Database, Printer, ChevronLeft, ArrowUpDown,
   Activity, Zap, Target, AlertCircle, Check, Eye, X, Filter
 } from 'lucide-react';
@@ -777,13 +781,15 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   const [selectedJustificationVisit, setSelectedJustificationVisit] = useState(null);
   const [visitFilter, setVisitFilter] = useState('ALL');
 
-  // Fire Extinguisher Inventory & Client Breakdown state
+  // All Assets & Fire Extinguisher Inventory & Client Breakdown state
   const [extinguisherView, setExtinguisherView] = useState(null); // null | 'BREAKDOWN' | 'REPORT'
+  const [inventoryCategoryTab, setInventoryCategoryTab] = useState('ALL'); // 'ALL' | 'Fire Extinguisher' | 'Delivery Hose Box'
   const [selectedExtClient, setSelectedExtClient] = useState(null);
   const [breakdownSearch, setBreakdownSearch] = useState('');
   const [breakdownSort, setBreakdownSort] = useState('desc'); // 'desc' | 'asc'
   const [breakdownPage, setBreakdownPage] = useState(1);
   const [reportSearch, setReportSearch] = useState('');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState('ALL');
   const [reportTypeFilter, setReportTypeFilter] = useState('ALL');
   const [reportCapacityFilter, setReportCapacityFilter] = useState('ALL');
   const [reportStatusFilter, setReportStatusFilter] = useState('ALL');
@@ -825,10 +831,12 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
   const totalExtinguishers = positions.filter(p => p.templateId === 'CL-11').length;
   const totalHoseBoxes     = positions.filter(p => p.templateId === 'CL-03').length;
 
-  // Actual Registered Fire Extinguishers inventory computation (excluding unassigned QR / other asset types)
+  // Actual Registered Assets computations (All categories & Extinguishers)
+  const allRegisteredAssets = getRegisteredAssets();
+  const totalRegisteredAssetsCount = allRegisteredAssets.length;
   const registeredExtinguishers = getRegisteredExtinguishers();
   const totalRegisteredExtinguishers = registeredExtinguishers.length;
-  const clientBreakdown = getClientExtinguisherBreakdown();
+  const clientBreakdown = getClientAssetBreakdown(inventoryCategoryTab === 'ALL' ? null : inventoryCategoryTab);
 
   const filteredPositions = positions.filter(p => {
     const q = searchQuery.toLowerCase();
@@ -1266,13 +1274,20 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
           onClick={() => setModalCategory('DEFECTS')}
         />
 
-        {/* KPI 5 – Total Positions */}
+        {/* KPI 5 – All Registered Assets (CLICKABLE ASSET INVENTORY) */}
         <MncKpiCard
-          title="Contracted AMC positions"
-          value={totalPositions}
+          icon={<Layers size={13} style={{ color: '#2563EB', flexShrink: 0 }} />}
+          title="All Registered Assets"
+          value={totalPositions.toLocaleString()}
           inlineStatus={`${sites.length} client plants`}
-          bottomText="Total equipment positions under AMC"
-          onClick={() => setModalCategory('CONTRACTS')}
+          bottomText="Complete Asset Inventory"
+          accentHoverColor="#2563EB"
+          onClick={() => {
+            setInventoryCategoryTab('ALL');
+            setExtinguisherView('BREAKDOWN');
+            setBreakdownSearch('');
+            setBreakdownPage(1);
+          }}
         />
       </div>
 
@@ -3028,13 +3043,18 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         );
       })()}
 
-      {/* ═══ FIRE EXTINGUISHER INVENTORY BREAKDOWN & REPORT MODAL ═══ */}
+      {/* ═══ ASSET INVENTORY BREAKDOWN & REPORT MODAL (ALL ASSETS & CATEGORIES) ═══ */}
       {extinguisherView && (() => {
         const isReport = extinguisherView === 'REPORT' && selectedExtClient;
-        const grandTotal = clientBreakdown.reduce((sum, c) => sum + c.totalExtinguishers, 0);
+        const currentCategory = inventoryCategoryTab;
+        const grandTotal = clientBreakdown.reduce((sum, c) => sum + (c.totalAssets !== undefined ? c.totalAssets : (c.totalExtinguishers || 0)), 0);
         const grandInspected = clientBreakdown.reduce((sum, c) => sum + c.inspectedCount, 0);
         const grandAttention = clientBreakdown.reduce((sum, c) => sum + c.attentionCount, 0);
         const grandPending = clientBreakdown.reduce((sum, c) => sum + c.pendingCount, 0);
+
+        const categoryTitle = currentCategory === 'ALL' 
+          ? 'All Registered Assets' 
+          : (currentCategory === 'Fire Extinguisher' ? 'Fire Extinguisher Inventory' : `${currentCategory} Inventory`);
 
         return (
           <div
@@ -3056,7 +3076,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                 backgroundColor: '#FFF',
                 borderRadius: '16px',
                 width: '100%',
-                maxWidth: isReport ? '1180px' : '980px',
+                maxWidth: isReport ? '1220px' : '1020px',
                 maxHeight: '92vh',
                 display: 'flex',
                 flexDirection: 'column',
@@ -3066,85 +3086,125 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
               }}
               onClick={e => e.stopPropagation()}
             >
-              {/* Header with Navigation Breadcrumb */}
+              {/* Header with Navigation Breadcrumb & Category Tabs */}
               <div style={{
                 padding: '16px 20px',
                 borderBottom: `1px solid ${DS.border}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
                 backgroundColor: '#F8FAFC'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: '#FEF2F2',
-                    color: '#DC2626',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <FireExtinguisher size={18} />
-                  </div>
-                  
-                  {/* Breadcrumb path */}
-                  <nav aria-label="Breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <button
-                      onClick={() => setExtinguisherView(null)}
-                      style={{
-                        background: 'none', border: 'none', padding: 0,
-                        color: DS.textMuted, cursor: 'pointer', fontWeight: 500
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.color = DS.navy}
-                      onMouseLeave={e => e.currentTarget.style.color = DS.textMuted}
-                    >
-                      Dashboard
-                    </button>
-                    <ChevronRight size={13} color="#94A3B8" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: currentCategory === 'Fire Extinguisher' ? '#FEF2F2' : '#EFF6FF',
+                      color: currentCategory === 'Fire Extinguisher' ? '#DC2626' : '#2563EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {currentCategory === 'Fire Extinguisher' ? <FireExtinguisher size={18} /> : <Layers size={18} />}
+                    </div>
                     
-                    <button
-                      onClick={() => setExtinguisherView('BREAKDOWN')}
-                      style={{
-                        background: 'none', border: 'none', padding: 0,
-                        color: isReport ? DS.textMuted : DS.textPrimary,
-                        cursor: isReport ? 'pointer' : 'default',
-                        fontWeight: isReport ? 500 : 700
-                      }}
-                      onMouseEnter={e => { if (isReport) e.currentTarget.style.color = DS.navy; }}
-                      onMouseLeave={e => { if (isReport) e.currentTarget.style.color = DS.textMuted; }}
-                    >
-                      Fire Extinguisher Inventory
-                    </button>
+                    {/* Breadcrumb path */}
+                    <nav aria-label="Breadcrumb" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                      <button
+                        onClick={() => setExtinguisherView(null)}
+                        style={{
+                          background: 'none', border: 'none', padding: 0,
+                          color: DS.textMuted, cursor: 'pointer', fontWeight: 500
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = DS.navy}
+                        onMouseLeave={e => e.currentTarget.style.color = DS.textMuted}
+                      >
+                        Dashboard
+                      </button>
+                      <ChevronRight size={13} color="#94A3B8" />
+                      
+                      <button
+                        onClick={() => setExtinguisherView('BREAKDOWN')}
+                        style={{
+                          background: 'none', border: 'none', padding: 0,
+                          color: isReport ? DS.textMuted : DS.textPrimary,
+                          cursor: isReport ? 'pointer' : 'default',
+                          fontWeight: isReport ? 500 : 700
+                        }}
+                        onMouseEnter={e => { if (isReport) e.currentTarget.style.color = DS.navy; }}
+                        onMouseLeave={e => { if (isReport) e.currentTarget.style.color = DS.textMuted; }}
+                      >
+                        {categoryTitle}
+                      </button>
 
-                    {isReport && (
-                      <>
-                        <ChevronRight size={13} color="#94A3B8" />
-                        <span style={{ fontWeight: 700, color: DS.textPrimary }}>
-                          {selectedExtClient.clientName}
-                        </span>
-                      </>
-                    )}
-                  </nav>
+                      {isReport && (
+                        <>
+                          <ChevronRight size={13} color="#94A3B8" />
+                          <span style={{ fontWeight: 700, color: DS.textPrimary }}>
+                            {selectedExtClient.clientName}
+                          </span>
+                        </>
+                      )}
+                    </nav>
+                  </div>
+
+                  <button
+                    onClick={() => setExtinguisherView(null)}
+                    style={{
+                      border: 'none', background: 'none', cursor: 'pointer',
+                      color: DS.textMuted, padding: '4px', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center'
+                    }}
+                    title="Close (Esc)"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
 
-                <button
-                  onClick={() => setExtinguisherView(null)}
-                  style={{
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    color: DS.textMuted, padding: '4px', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center'
-                  }}
-                  title="Close (Esc)"
-                >
-                  <X size={20} />
-                </button>
+                {/* Category Scope Filter Pills */}
+                {!isReport && (
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
+                    {[
+                      { id: 'ALL', label: `All Registered Assets (${totalRegisteredAssetsCount})`, icon: Layers, color: '#2563EB' },
+                      { id: 'Fire Extinguisher', label: `Fire Extinguishers (${totalRegisteredExtinguishers})`, icon: FireExtinguisher, color: '#DC2626' },
+                      { id: 'Delivery Hose Box', label: `Delivery Hose Boxes (${totalHoseBoxes})`, icon: ShieldCheck, color: '#0B6B63' }
+                    ].map(tab => {
+                      const active = inventoryCategoryTab === tab.id;
+                      const IconComp = tab.icon;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            setInventoryCategoryTab(tab.id);
+                            setBreakdownPage(1);
+                            setReportPage(1);
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '4px 11px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: active ? 700 : 500,
+                            cursor: 'pointer',
+                            border: active ? `1.5px solid ${tab.color}` : '1px solid #E2E8F0',
+                            backgroundColor: active ? `${tab.color}12` : '#FFF',
+                            color: active ? tab.color : '#64748B',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <IconComp size={11} color={active ? tab.color : '#94A3B8'} />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* ──────────────────────────────────────────────────────────── */}
-              {/* VIEW 1: CLIENT-WISE BREAKDOWN TABLE                          */}
+              {/* VIEW 1: CLIENT-WISE BREAKDOWN TABLE (ALL ASSETS / FILTERED)  */}
               {/* ──────────────────────────────────────────────────────────── */}
               {!isReport && (() => {
                 const q = breakdownSearch.trim().toLowerCase();
@@ -3156,8 +3216,10 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                 );
 
                 filteredClients.sort((a, b) => {
-                  if (breakdownSort === 'asc') return a.totalExtinguishers - b.totalExtinguishers;
-                  return b.totalExtinguishers - a.totalExtinguishers;
+                  const countA = a.totalAssets !== undefined ? a.totalAssets : (a.totalExtinguishers || 0);
+                  const countB = b.totalAssets !== undefined ? b.totalAssets : (b.totalExtinguishers || 0);
+                  if (breakdownSort === 'asc') return countA - countB;
+                  return countB - countA;
                 });
 
                 const pageSize = 8;
@@ -3166,7 +3228,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                    {/* KPI Strip across all clients */}
+                    {/* KPI Metric Strip */}
                     <div style={{
                       padding: '14px 20px',
                       backgroundColor: '#FFFFFF',
@@ -3175,9 +3237,13 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                       gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                       gap: '12px'
                     }}>
-                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
-                        <div style={{ fontSize: '11px', color: '#991B1B', fontWeight: 600 }}>Total Extinguishers</div>
-                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#DC2626' }}>{grandTotal.toLocaleString()}</div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: currentCategory === 'Fire Extinguisher' ? '#FEF2F2' : '#EFF6FF', border: `1px solid ${currentCategory === 'Fire Extinguisher' ? '#FECACA' : '#BFDBFE'}` }}>
+                        <div style={{ fontSize: '11px', color: currentCategory === 'Fire Extinguisher' ? '#991B1B' : '#1E40AF', fontWeight: 600 }}>
+                          {currentCategory === 'ALL' ? 'Total Registered Assets' : `Total ${currentCategory}s`}
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: currentCategory === 'Fire Extinguisher' ? '#DC2626' : '#2563EB' }}>
+                          {grandTotal.toLocaleString()}
+                        </div>
                       </div>
                       <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
                         <div style={{ fontSize: '11px', color: '#166534', fontWeight: 600 }}>Verified OK</div>
@@ -3191,9 +3257,9 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                         <div style={{ fontSize: '11px', color: '#475569', fontWeight: 600 }}>Pending Inspection</div>
                         <div style={{ fontSize: '20px', fontWeight: 700, color: '#64748B' }}>{grandPending.toLocaleString()}</div>
                       </div>
-                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
-                        <div style={{ fontSize: '11px', color: '#1E40AF', fontWeight: 600 }}>Active Clients</div>
-                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#2563EB' }}>{clientBreakdown.length}</div>
+                      <div style={{ padding: '8px 12px', borderRadius: '8px', backgroundColor: '#FAF5FF', border: '1px solid #E9D5FF' }}>
+                        <div style={{ fontSize: '11px', color: '#6B21A8', fontWeight: 600 }}>Active Clients</div>
+                        <div style={{ fontSize: '20px', fontWeight: 700, color: '#7E22CE' }}>{clientBreakdown.length}</div>
                       </div>
                     </div>
 
@@ -3260,22 +3326,25 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             <th style={{ padding: '10px 14px', textAlign: 'center', width: '45px', color: '#64748B', fontWeight: 600 }}>#</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Client Organization</th>
                             <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Primary Plant / Site</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Inventory Types Breakdown</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#64748B', fontWeight: 600 }}>Equipment Breakdown</th>
                             <th style={{ padding: '10px 14px', textAlign: 'center', color: '#64748B', fontWeight: 600 }}>Status Summary</th>
                             <th style={{ padding: '10px 14px', textAlign: 'right', color: '#64748B', fontWeight: 600 }}>Total Units</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '110px', color: '#64748B', fontWeight: 600 }}>Action</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', width: '120px', color: '#64748B', fontWeight: 600 }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
                           {paginatedClients.length === 0 ? (
                             <tr>
                               <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: DS.textMuted }}>
-                                No client fire extinguisher records match your search query.
+                                No client asset records match your search query.
                               </td>
                             </tr>
                           ) : (
                             paginatedClients.map((client, idx) => {
                               const globalIndex = (breakdownPage - 1) * pageSize + idx + 1;
+                              const clientTotal = client.totalAssets !== undefined ? client.totalAssets : (client.totalExtinguishers || 0);
+                              const breakdownMap = client.categoriesBreakdown || client.typesBreakdown || {};
+
                               return (
                                 <tr
                                   key={client.clientName}
@@ -3283,6 +3352,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                     setSelectedExtClient(client);
                                     setExtinguisherView('REPORT');
                                     setReportSearch('');
+                                    setReportCategoryFilter('ALL');
                                     setReportTypeFilter('ALL');
                                     setReportCapacityFilter('ALL');
                                     setReportStatusFilter('ALL');
@@ -3315,7 +3385,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                   </td>
                                   <td style={{ padding: '12px 14px' }}>
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                      {Object.entries(client.typesBreakdown).map(([t, count]) => (
+                                      {Object.entries(breakdownMap).map(([t, count]) => (
                                         <span
                                           key={t}
                                           style={{
@@ -3355,11 +3425,11 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                     <span style={{
                                       fontSize: '16px',
                                       fontWeight: 700,
-                                      color: '#DC2626',
+                                      color: currentCategory === 'Fire Extinguisher' ? '#DC2626' : '#2563EB',
                                       letterSpacing: '-0.02em',
                                       fontVariantNumeric: 'tabular-nums'
                                     }}>
-                                      {client.totalExtinguishers.toLocaleString()}
+                                      {clientTotal.toLocaleString()}
                                     </span>
                                   </td>
                                   <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -3373,7 +3443,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                         gap: '3px'
                                       }}
                                     >
-                                      Report <ArrowRight size={11} />
+                                      View Assets <ArrowRight size={11} />
                                     </span>
                                   </td>
                                 </tr>
@@ -3388,7 +3458,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                               Grand Total ({clientBreakdown.length} Contracted Clients)
                             </td>
                             <td style={{ padding: '12px 14px', color: DS.textSec, fontSize: '11.5px' }}>
-                              All registered extinguisher assets across database
+                              All registered {currentCategory === 'ALL' ? 'assets' : currentCategory.toLowerCase() + 's'} across database
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               <span style={{ fontSize: '11px', fontWeight: 700, color: DS.textSec }}>
@@ -3396,7 +3466,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                               </span>
                             </td>
                             <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                              <span style={{ fontSize: '18px', fontWeight: 800, color: '#DC2626', fontVariantNumeric: 'tabular-nums' }}>
+                              <span style={{ fontSize: '18px', fontWeight: 800, color: currentCategory === 'Fire Extinguisher' ? '#DC2626' : '#2563EB', fontVariantNumeric: 'tabular-nums' }}>
                                 {grandTotal.toLocaleString()}
                               </span>
                             </td>
@@ -3416,7 +3486,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                       backgroundColor: '#F8FAFC'
                     }}>
                       <div style={{ fontSize: '12px', color: DS.textMuted }}>
-                        Showing {paginatedClients.length} of {filteredClients.length} clients ({grandTotal.toLocaleString()} total extinguishers)
+                        Showing {paginatedClients.length} of {filteredClients.length} clients ({grandTotal.toLocaleString()} total units)
                       </div>
                       {totalPages > 1 && (
                         <div style={{ display: 'flex', gap: '6px' }}>
@@ -3461,28 +3531,33 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
               })()}
 
               {/* ──────────────────────────────────────────────────────────── */}
-              {/* VIEW 2: COMPLETE CLIENT EXTINGUISHER REPORT                  */}
+              {/* VIEW 2: COMPLETE CLIENT ASSET REPORT (ALL ASSETS FOR CLIENT) */}
               {/* ──────────────────────────────────────────────────────────── */}
               {isReport && (() => {
                 const client = selectedExtClient;
-                const clientExtinguishers = client.extinguishers || getRegisteredExtinguishers(client.siteId || client.clientName);
+                // Fetch all assets for this client
+                const rawClientAssets = client.assets || getRegisteredAssets(client.siteId || client.clientName);
 
                 // Available dynamic filter options
-                const availableTypes = [...new Set(clientExtinguishers.map(e => e.currentEquipment?.type || e.equipmentType).filter(Boolean))];
-                const availableCapacities = [...new Set(clientExtinguishers.map(e => e.currentEquipment?.capacity).filter(Boolean))];
-                const availableSites = [...new Set(clientExtinguishers.map(e => e.siteName || siteName(e)).filter(Boolean))];
+                const availableCategories = [...new Set(rawClientAssets.map(e => e.equipmentCategory || (e.templateId === 'CL-03' ? 'Delivery Hose Box' : 'Fire Extinguisher')).filter(Boolean))];
+                const availableTypes = [...new Set(rawClientAssets.map(e => e.currentEquipment?.type || e.equipmentType).filter(Boolean))];
+                const availableCapacities = [...new Set(rawClientAssets.map(e => e.currentEquipment?.capacity).filter(Boolean))];
+                const availableSites = [...new Set(rawClientAssets.map(e => e.siteName || siteName(e)).filter(Boolean))];
 
                 // Filtering
                 const sq = reportSearch.trim().toLowerCase();
-                const filteredReport = clientExtinguishers.filter(e => {
+                const filteredReport = rawClientAssets.filter(e => {
                   const posId = (e.positionId || e.id || '').toLowerCase();
                   const qr = (e.qrCode || e.qrToken || '').toLowerCase();
                   const sn = (e.currentEquipment?.serialNo || e.currentEquipment?.serialNumber || '').toLowerCase();
                   const loc = (e.locationDescription || e.location || e.area || '').toLowerCase();
+                  const cat = (e.equipmentCategory || (e.templateId === 'CL-03' ? 'Delivery Hose Box' : 'Fire Extinguisher')).toLowerCase();
                   const eqT = (e.currentEquipment?.type || e.equipmentType || '').toLowerCase();
 
-                  const matchSearch = !sq || posId.includes(sq) || qr.includes(sq) || sn.includes(sq) || loc.includes(sq) || eqT.includes(sq);
+                  const matchSearch = !sq || posId.includes(sq) || qr.includes(sq) || sn.includes(sq) || loc.includes(sq) || cat.includes(sq) || eqT.includes(sq);
 
+                  const curCategory = e.equipmentCategory || (e.templateId === 'CL-03' ? 'Delivery Hose Box' : 'Fire Extinguisher');
+                  const matchCategory = reportCategoryFilter === 'ALL' || curCategory === reportCategoryFilter;
                   const currentT = e.currentEquipment?.type || e.equipmentType;
                   const matchType = reportTypeFilter === 'ALL' || currentT === reportTypeFilter;
                   const matchCap = reportCapacityFilter === 'ALL' || (e.currentEquipment?.capacity || '') === reportCapacityFilter;
@@ -3492,7 +3567,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                     (reportStatusFilter === 'PENDING' && (!e.inspectionStatus || e.inspectionStatus.includes('Pending')));
                   const matchSite = reportSiteFilter === 'ALL' || (e.siteName || siteName(e)) === reportSiteFilter;
 
-                  return matchSearch && matchType && matchCap && matchStatus && matchSite;
+                  return matchSearch && matchCategory && matchType && matchCap && matchStatus && matchSite;
                 });
 
                 const reportPageSize = 12;
@@ -3537,15 +3612,15 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             {client.clientName}
                           </div>
                           <div style={{ fontSize: '11px', color: DS.textMuted }}>
-                            {client.siteName} · Total: <strong style={{ color: '#DC2626' }}>{clientExtinguishers.length} Extinguishers</strong>
+                            {client.siteName} · Total: <strong style={{ color: '#2563EB' }}>{rawClientAssets.length} Registered Units</strong>
                           </div>
                         </div>
                       </div>
 
-                      {/* Export Actions */}
+                      {/* Export Actions (Excel, CSV, Print for All Assets) */}
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <button
-                          onClick={() => downloadClientExtinguishersExcel({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          onClick={() => downloadClientAssetsExcel({ clientName: client.clientName, siteName: client.siteName, assets: filteredReport, reportTitle: `${client.clientName}_Assets` })}
                           style={{
                             height: '32px',
                             padding: '0 11px',
@@ -3560,12 +3635,12 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             alignItems: 'center',
                             gap: '5px'
                           }}
-                          title="Export complete report to formatted Excel (.xlsx)"
+                          title="Export all client assets to formatted Excel (.xlsx)"
                         >
                           <Download size={13} /> Excel (.xlsx)
                         </button>
                         <button
-                          onClick={() => downloadClientExtinguishersCSV({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          onClick={() => downloadClientAssetsCSV({ clientName: client.clientName, siteName: client.siteName, assets: filteredReport, reportTitle: `${client.clientName}_Assets` })}
                           style={{
                             height: '32px',
                             padding: '0 11px',
@@ -3580,12 +3655,12 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             alignItems: 'center',
                             gap: '5px'
                           }}
-                          title="Export report to CSV"
+                          title="Export all client assets to CSV"
                         >
                           <FileSpreadsheet size={13} /> CSV
                         </button>
                         <button
-                          onClick={() => printClientExtinguishersReport({ clientName: client.clientName, siteName: client.siteName, extinguishers: filteredReport })}
+                          onClick={() => printClientAssetsReport({ clientName: client.clientName, siteName: client.siteName, assets: filteredReport, reportTitle: `${client.clientName} Asset Inventory` })}
                           style={{
                             height: '32px',
                             padding: '0 11px',
@@ -3600,7 +3675,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             alignItems: 'center',
                             gap: '5px'
                           }}
-                          title="Print or save PDF report"
+                          title="Print or save PDF asset dossier"
                         >
                           <Printer size={13} /> Print / PDF
                         </button>
@@ -3617,7 +3692,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                       gap: '8px',
                       flexWrap: 'wrap'
                     }}>
-                      <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '320px' }}>
+                      <div style={{ position: 'relative', flex: 1, minWidth: '180px', maxWidth: '300px' }}>
                         <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                         <input
                           type="text"
@@ -3636,6 +3711,28 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                           }}
                         />
                       </div>
+
+                      {/* Category Filter */}
+                      {availableCategories.length > 1 && (
+                        <select
+                          value={reportCategoryFilter}
+                          onChange={e => { setReportCategoryFilter(e.target.value); setReportPage(1); }}
+                          style={{
+                            height: '30px',
+                            padding: '0 8px',
+                            borderRadius: '6px',
+                            border: `1px solid ${DS.border}`,
+                            backgroundColor: '#FFF',
+                            fontSize: '11.5px',
+                            color: DS.textPrimary
+                          }}
+                        >
+                          <option value="ALL">All Categories ({availableCategories.length})</option>
+                          {availableCategories.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      )}
 
                       {/* Type Filter */}
                       <select
@@ -3699,10 +3796,11 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                         <option value="PENDING">Pending</option>
                       </select>
 
-                      {(reportSearch || reportTypeFilter !== 'ALL' || reportCapacityFilter !== 'ALL' || reportStatusFilter !== 'ALL') && (
+                      {(reportSearch || reportCategoryFilter !== 'ALL' || reportTypeFilter !== 'ALL' || reportCapacityFilter !== 'ALL' || reportStatusFilter !== 'ALL') && (
                         <button
                           onClick={() => {
                             setReportSearch('');
+                            setReportCategoryFilter('ALL');
                             setReportTypeFilter('ALL');
                             setReportCapacityFilter('ALL');
                             setReportStatusFilter('ALL');
@@ -3725,7 +3823,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                       )}
                     </div>
 
-                    {/* Detailed Report Table */}
+                    {/* Detailed Report Table (All Assets for this Client) */}
                     <div style={{ flex: 1, overflowY: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                         <thead>
@@ -3733,8 +3831,9 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                             <th style={{ padding: '9px 10px', textAlign: 'center', width: '38px', color: '#64748B' }}>#</th>
                             <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Asset ID</th>
                             <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>QR Number</th>
-                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Extinguisher Type</th>
-                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Capacity</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Category</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Equipment Type</th>
+                            <th style={{ padding: '9px 10px', textAlign: 'center', color: '#64748B' }}>Cap. / Spec</th>
                             <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Make / Mfr</th>
                             <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Serial No.</th>
                             <th style={{ padding: '9px 10px', textAlign: 'left', color: '#64748B' }}>Location / Position</th>
@@ -3747,8 +3846,8 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                         <tbody>
                           {paginatedReport.length === 0 ? (
                             <tr>
-                              <td colSpan={12} style={{ padding: '36px', textAlign: 'center', color: DS.textMuted }}>
-                                No fire extinguisher records match your filter criteria.
+                              <td colSpan={13} style={{ padding: '36px', textAlign: 'center', color: DS.textMuted }}>
+                                No asset records match your filter criteria.
                               </td>
                             </tr>
                           ) : (
@@ -3757,6 +3856,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                               const isOK = pos.inspectionStatus === 'Inspected - OK';
                               const isAtt = pos.inspectionStatus === 'Inspected - Attention';
                               const loc = [pos.area, pos.locationDescription || pos.location].filter(Boolean).join(' — ') || 'Plant Floor';
+                              const category = pos.equipmentCategory || (pos.templateId === 'CL-03' ? 'Delivery Hose Box' : (pos.templateId === 'CL-11' ? 'Fire Extinguisher' : pos.equipmentType || 'Safety Equipment'));
 
                               return (
                                 <tr
@@ -3787,8 +3887,11 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                       {pos.qrCode || pos.qrToken || '—'}
                                     </span>
                                   </td>
+                                  <td style={{ padding: '10px', color: '#0B6B63', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                    {category}
+                                  </td>
                                   <td style={{ padding: '10px', fontWeight: 500, color: DS.textPrimary }}>
-                                    {pos.currentEquipment?.type || pos.equipmentType || 'Fire Extinguisher'}
+                                    {pos.currentEquipment?.type || pos.equipmentType || category}
                                   </td>
                                   <td style={{ padding: '10px', textAlign: 'center', fontWeight: 600, color: '#0B6B63', whiteSpace: 'nowrap' }}>
                                     {pos.currentEquipment?.capacity || '—'}
@@ -3894,7 +3997,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                       backgroundColor: '#F8FAFC'
                     }}>
                       <div style={{ fontSize: '11.5px', color: DS.textMuted }}>
-                        Showing {paginatedReport.length} of {filteredReport.length} extinguishers ({clientExtinguishers.length} total registered for {client.clientName})
+                        Showing {paginatedReport.length} of {filteredReport.length} registered assets ({rawClientAssets.length} total registered for {client.clientName})
                       </div>
                       {reportTotalPages > 1 && (
                         <div style={{ display: 'flex', gap: '6px' }}>
