@@ -238,7 +238,7 @@ function MncKpiCard({ title, value, inlineStatus, bottomText, onClick, accentHov
   );
 }
 
-/* ── Monthly AMC Visits & Punch Analytics Chart (User Requested Dual-Axis Style) ── */
+/* ── Monthly AMC Visits & Punch Analytics Chart (Compact MNC Style) ── */
 function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
   const [filterMode, setFilterMode] = useState('both'); // 'both' | 'visits' | 'units'
   const [hoveredIdx, setHoveredIdx] = useState(null);
@@ -250,10 +250,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
       shortMonth: 'July',
       visits: 28,
       units: 136,
-      cx: 163,
-      cyVisit: 133.7,
-      cyUnit: 148.1,
-      badgeY: 108,
+      cx: 145,
+      cyVisit: 84,
+      cyUnit: 93.4,
+      badgeY: 67,
       breakdown: [
         { name: 'Ailum Plant U4', visits: 8, units: 42 },
         { name: 'Atul Limited C2', visits: 7, units: 36 },
@@ -266,10 +266,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
       shortMonth: 'August',
       visits: 55,
       units: 318,
-      cx: 348,
-      cyVisit: 50.4,
-      cyUnit: 51.9,
-      badgeY: 24,
+      cx: 325,
+      cyVisit: 30,
+      cyUnit: 31,
+      badgeY: 13,
       breakdown: [
         { name: 'Ailum Plant U4', visits: 16, units: 98 },
         { name: 'Atul Limited C2', visits: 14, units: 82 },
@@ -282,10 +282,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
       shortMonth: 'September',
       visits: 29,
       units: 185,
-      cx: 533,
-      cyVisit: 130.6,
-      cyUnit: 122.2,
-      badgeY: 96,
+      cx: 505,
+      cyVisit: 82,
+      cyUnit: 76.6,
+      badgeY: 65,
       breakdown: [
         { name: 'Ailum Plant U4', visits: 9, units: 56 },
         { name: 'Atul Limited C2', visits: 7, units: 48 },
@@ -298,10 +298,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
       shortMonth: 'October',
       visits: 47,
       units: 268,
-      cx: 718,
-      cyVisit: 75.1,
-      cyUnit: 78.3,
-      badgeY: 48,
+      cx: 685,
+      cyVisit: 46,
+      cyUnit: 48.1,
+      badgeY: 29,
       breakdown: [
         { name: 'Ailum Plant U4', visits: 14, units: 82 },
         { name: 'Atul Limited C2', visits: 12, units: 68 },
@@ -315,85 +315,83 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
   const totalUnits = monthData.reduce((acc, d) => acc + d.units, 0);   // 907
   const avgVisits = Math.round(totalVisits / monthData.length);        // 40
 
-  const splinePath = "M 163 148 C 246 148, 265 52, 348 52 C 431 52, 450 122, 533 122 C 616 122, 635 78, 718 78";
+  const splinePath = "M 145 93.4 C 226 93.4, 244 31, 325 31 C 406 31, 424 76.6, 505 76.6 C 586 76.6, 604 48.1, 685 48.1";
 
   // Grid levels (60 Visits down to 0, 350 Units down to 0)
   const gridLevels = [
-    { visit: '60 Visits', unit: '350 Units', y: 35 },
-    { visit: '50 Visits', unit: '290 Units', y: 65.8 },
-    { visit: '40 Visits', unit: '230 Units', y: 96.6 },
-    { visit: '30 Visits', unit: '175 Units', y: 127.5 },
-    { visit: '20 Visits', unit: '115 Units', y: 158.3 },
-    { visit: '10 Visits', unit: '60 Units',  y: 189.1 },
-    { visit: '0 Visits',  unit: '0 Units',   y: 220 }
+    { visit: '60 Visits', unit: '350 Units', y: 20 },
+    { visit: '45 Visits', unit: '260 Units', y: 50 },
+    { visit: '30 Visits', unit: '175 Units', y: 80 },
+    { visit: '15 Visits', unit: '90 Units',  y: 110 },
+    { visit: '0 Visits',  unit: '0 Units',   y: 140 }
   ];
 
   return (
     <div style={{
       backgroundColor: '#FFFFFF',
       border: '1px solid #ECECEC',
-      borderRadius: '16px',
-      padding: '20px 24px',
+      borderRadius: '12px',
+      padding: '12px 18px',
       boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
       boxSizing: 'border-box',
       width: '100%',
       position: 'relative'
     }}>
-      {/* ── Header ── */}
+      {/* ── Row 1: Title, Badges & Toggle ── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '12px',
-        marginBottom: '14px'
+        gap: '8px',
+        marginBottom: '6px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#111827', fontFamily: "'Poppins', 'Inter', sans-serif" }}>
-            Monthly AMC Visits & Punch Analytics
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block' }} />
+          <h3 style={{ margin: 0, fontSize: '13.5px', fontWeight: 600, color: '#111827', fontFamily: "'Poppins', 'Inter', sans-serif" }}>
+            AMC Visits & Punch Analytics
           </h3>
-          <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: 400 }}>· Excl. Cancelled</span>
+          <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 400 }}>· Excl. Cancelled</span>
 
           {/* Badges */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginLeft: '4px', flexWrap: 'wrap' }}>
             <span style={{
               backgroundColor: '#F3F4F6',
               border: '1px solid #E5E7EB',
-              borderRadius: '6px',
-              padding: '3px 9px',
-              fontSize: '12px',
+              borderRadius: '4px',
+              padding: '1.5px 7px',
+              fontSize: '11px',
               fontWeight: 500,
               color: '#374151',
               fontVariantNumeric: 'tabular-nums'
             }}>
-              Total: <strong style={{ fontWeight: 600 }}>{totalVisits} Visits</strong>
+              Total: <strong>{totalVisits} Visits</strong>
             </span>
 
             <span style={{
               backgroundColor: '#ECFDF5',
               border: '1px solid #A7F3D0',
-              borderRadius: '6px',
-              padding: '3px 9px',
-              fontSize: '12px',
+              borderRadius: '4px',
+              padding: '1.5px 7px',
+              fontSize: '11px',
               fontWeight: 500,
               color: '#047857',
               fontVariantNumeric: 'tabular-nums'
             }}>
-              Active AMC: <strong style={{ fontWeight: 600 }}>{totalUnits} Units</strong>
+              Active: <strong>{totalUnits} Units</strong>
             </span>
 
             <span style={{
               backgroundColor: '#F0FDF4',
               border: '1px solid #BBF7D0',
-              borderRadius: '6px',
-              padding: '3px 9px',
-              fontSize: '12px',
+              borderRadius: '4px',
+              padding: '1.5px 7px',
+              fontSize: '11px',
               fontWeight: 500,
               color: '#15803D',
               fontVariantNumeric: 'tabular-nums'
             }}>
-              Peak: <strong style={{ fontWeight: 600 }}>October 2026 (47 Visits · 268 Units)</strong>
+              Peak: <strong>Oct (47V · 268U)</strong>
             </span>
           </div>
         </div>
@@ -401,8 +399,8 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
         {/* Filter Toggle Buttons */}
         <div style={{
           display: 'inline-flex',
-          padding: '3px',
-          borderRadius: '8px',
+          padding: '2px',
+          borderRadius: '6px',
           backgroundColor: '#F3F4F6',
           gap: '2px'
         }}>
@@ -417,13 +415,13 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
               style={{
                 border: 'none',
                 cursor: 'pointer',
-                borderRadius: '6px',
-                padding: '4px 12px',
-                fontSize: '12px',
+                borderRadius: '5px',
+                padding: '2.5px 9px',
+                fontSize: '11px',
                 fontWeight: 500,
                 backgroundColor: filterMode === tab.id ? '#FFFFFF' : 'transparent',
                 color: filterMode === tab.id ? '#111827' : '#6B7280',
-                boxShadow: filterMode === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: filterMode === tab.id ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -433,49 +431,49 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
         </div>
       </div>
 
-      {/* ── Subheader / Legend ── */}
+      {/* ── Row 2: Subheader / Legend ── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '10px',
-        fontSize: '12px',
+        marginBottom: '6px',
+        fontSize: '11px',
         color: '#6B7280'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {(filterMode === 'both' || filterMode === 'visits') && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: 10, height: 10, backgroundColor: '#10B981', borderRadius: '2px', display: 'inline-block' }} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: 8, height: 8, backgroundColor: '#10B981', borderRadius: '2px', display: 'inline-block' }} />
               <span style={{ color: '#111827', fontWeight: 500 }}>AMC Visits [Left]</span>
             </span>
           )}
           {(filterMode === 'both' || filterMode === 'units') && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: 10, height: 10, backgroundColor: '#0E7490', borderRadius: '50%', display: 'inline-block' }} />
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: 8, height: 8, backgroundColor: '#0E7490', borderRadius: '50%', display: 'inline-block' }} />
               <span style={{ color: '#111827', fontWeight: 500 }}>Equipment Punched [Right]</span>
             </span>
           )}
           <span style={{ color: '#9CA3AF' }}>· Avg: {avgVisits} visits/mo</span>
         </div>
 
-        <span style={{ color: '#9CA3AF', fontSize: '11.5px' }}>
+        <span style={{ color: '#9CA3AF', fontSize: '10.5px' }}>
           Hover points for breakdown
         </span>
       </div>
 
-      {/* ── SVG Chart ── */}
+      {/* ── SVG Chart (Compact Height 160) ── */}
       <div style={{ width: '100%', overflowX: 'auto' }}>
         <svg
-          viewBox="0 0 880 260"
-          style={{ width: '100%', height: 'auto', display: 'block', minWidth: '600px' }}
+          viewBox="0 0 840 160"
+          style={{ width: '100%', height: 'auto', display: 'block', minWidth: '550px' }}
         >
           {/* Horizontal Grid lines */}
           {gridLevels.map((lvl, i) => (
             <g key={i}>
               <line
-                x1="65"
+                x1="60"
                 y1={lvl.y}
-                x2="815"
+                x2="780"
                 y2={lvl.y}
                 stroke="#F3F4F6"
                 strokeWidth="1"
@@ -483,11 +481,11 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
               {/* Left Y Axis Label */}
               {(filterMode === 'both' || filterMode === 'visits') && (
                 <text
-                  x="58"
-                  y={lvl.y + 3.5}
+                  x="52"
+                  y={lvl.y + 3}
                   textAnchor="end"
                   fill="#10B981"
-                  fontSize="11"
+                  fontSize="9.5"
                   fontWeight="500"
                   fontFamily="'Inter', sans-serif"
                 >
@@ -497,11 +495,11 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
               {/* Right Y Axis Label */}
               {(filterMode === 'both' || filterMode === 'units') && (
                 <text
-                  x="822"
-                  y={lvl.y + 3.5}
+                  x="788"
+                  y={lvl.y + 3}
                   textAnchor="start"
                   fill="#0284C7"
-                  fontSize="11"
+                  fontSize="9.5"
                   fontWeight="500"
                   fontFamily="'Inter', sans-serif"
                 >
@@ -514,19 +512,19 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
           {/* Bar Chart (Visits) */}
           {(filterMode === 'both' || filterMode === 'visits') && (
             monthData.map((d, i) => {
-              const barHeight = 220 - d.cyVisit;
+              const barHeight = 140 - d.cyVisit;
               const isHov = hoveredIdx === i;
               return (
                 <g key={`bar-${i}`}>
                   <rect
-                    x={d.cx - 23}
+                    x={d.cx - 14}
                     y={d.cyVisit}
-                    width={46}
+                    width={28}
                     height={barHeight}
-                    rx="8"
-                    ry="8"
+                    rx="5"
+                    ry="5"
                     fill={isHov ? '#059669' : '#10B981'}
-                    style={{ transition: 'all 0.2s ease', cursor: 'pointer' }}
+                    style={{ transition: 'all 0.18s ease', cursor: 'pointer' }}
                     onMouseEnter={() => setHoveredIdx(i)}
                     onMouseLeave={() => setHoveredIdx(null)}
                   />
@@ -542,7 +540,7 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
                 d={splinePath}
                 fill="none"
                 stroke="#0E7490"
-                strokeWidth="3.5"
+                strokeWidth="2.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -554,10 +552,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
                     key={`pt-${i}`}
                     cx={d.cx}
                     cy={d.cyUnit}
-                    r={isHov ? 7 : 5}
+                    r={isHov ? 6 : 4.5}
                     fill="#FFFFFF"
                     stroke="#0E7490"
-                    strokeWidth={isHov ? 4 : 3}
+                    strokeWidth={isHov ? 3.5 : 2.5}
                     style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
                     onMouseEnter={() => setHoveredIdx(i)}
                     onMouseLeave={() => setHoveredIdx(null)}
@@ -569,8 +567,8 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
 
           {/* Floating Pill Badges */}
           {monthData.map((d, i) => {
-            const pillW = 114;
-            const pillH = 22;
+            const pillW = 96;
+            const pillH = 17;
             const isHov = hoveredIdx === i;
             return (
               <g
@@ -584,23 +582,23 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
                   y={d.badgeY}
                   width={pillW}
                   height={pillH}
-                  rx="6"
-                  ry="6"
+                  rx="4"
+                  ry="4"
                   fill="#FFFFFF"
                   stroke={isHov ? '#10B981' : '#E5E7EB'}
                   strokeWidth={isHov ? '1.5' : '1'}
-                  filter="drop-shadow(0 1px 3px rgba(0,0,0,0.06))"
+                  filter="drop-shadow(0 1px 2px rgba(0,0,0,0.05))"
                 />
                 <text
                   x={d.cx}
-                  y={d.badgeY + 14.5}
+                  y={d.badgeY + 11.5}
                   textAnchor="middle"
                   fill="#374151"
-                  fontSize="10.5"
+                  fontSize="9.5"
                   fontWeight="600"
                   fontFamily="'Inter', sans-serif"
                 >
-                  {d.visits} Visits · {d.units} Units
+                  {d.visits}V · {d.units}U
                 </text>
               </g>
             );
@@ -611,10 +609,10 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
             <text
               key={`x-lbl-${i}`}
               x={d.cx}
-              y="244"
+              y="154"
               textAnchor="middle"
               fill={hoveredIdx === i ? '#111827' : '#4B5563'}
-              fontSize="12"
+              fontSize="11"
               fontWeight={hoveredIdx === i ? 600 : 500}
               fontFamily="'Inter', sans-serif"
             >
@@ -624,12 +622,12 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
         </svg>
       </div>
 
-      {/* ── Bottom Monthly Breakdown Strip ── */}
+      {/* ── Bottom Monthly Breakdown Strip (Compact 4-grid) ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: '10px',
-        marginTop: '12px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '8px',
+        marginTop: '8px'
       }}>
         {monthData.map((d, i) => {
           const isHov = hoveredIdx === i;
@@ -641,26 +639,26 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
               style={{
                 backgroundColor: isHov ? '#FFFFFF' : '#F9FAFB',
                 border: `1px solid ${isHov ? '#10B981' : '#F3F4F6'}`,
-                borderRadius: '8px',
-                padding: '9px 14px',
+                borderRadius: '6px',
+                padding: '6px 10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                boxShadow: isHov ? '0 2px 6px rgba(16,185,129,0.12)' : 'none'
+                boxShadow: isHov ? '0 1px 4px rgba(16,185,129,0.12)' : 'none'
               }}
             >
-              <span style={{ fontSize: '12px', fontWeight: 500, color: '#374151' }}>
+              <span style={{ fontSize: '11px', fontWeight: 500, color: '#374151' }}>
                 {d.month}
               </span>
               <span style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: '#059669',
                 fontVariantNumeric: 'tabular-nums'
               }}>
-                {d.visits} / <span style={{ color: '#0E7490' }}>{d.units} Units</span>
+                {d.visits} / <span style={{ color: '#0E7490' }}>{d.units}U</span>
               </span>
             </div>
           );
@@ -670,30 +668,30 @@ function MonthlyAmcVisitAnalyticsCard({ sites = [], positions = [] }) {
       {/* ── Hover Tooltip Breakdown ── */}
       {hoveredIdx !== null && (
         <div style={{
-          marginTop: '10px',
-          padding: '10px 14px',
+          marginTop: '8px',
+          padding: '8px 12px',
           backgroundColor: '#F0FDF4',
           border: '1px solid #BBF7D0',
-          borderRadius: '8px',
-          fontSize: '12px',
+          borderRadius: '6px',
+          fontSize: '11px',
           color: '#166534',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '8px',
-          animation: 'fadeUp 0.2s ease both'
+          gap: '6px',
+          animation: 'fadeUp 0.18s ease both'
         }}>
           <div>
-            <strong>{monthData[hoveredIdx].month} AMC Visit Breakdown:</strong>{' '}
+            <strong>{monthData[hoveredIdx].month} AMC Breakdown:</strong>{' '}
             {monthData[hoveredIdx].breakdown.map((b, idx) => (
-              <span key={idx} style={{ marginLeft: idx > 0 ? '8px' : '4px' }}>
-                {b.name} ({b.visits} visits · {b.units} units){idx < 3 ? ' ·' : ''}
+              <span key={idx} style={{ marginLeft: idx > 0 ? '6px' : '3px' }}>
+                {b.name} ({b.visits}V · {b.units}U){idx < 3 ? ' ·' : ''}
               </span>
             ))}
           </div>
           <span style={{ fontWeight: 600, color: '#15803D' }}>
-            ✓ 100% On-Time SLA Met
+            ✓ 100% On-Time SLA
           </span>
         </div>
       )}
