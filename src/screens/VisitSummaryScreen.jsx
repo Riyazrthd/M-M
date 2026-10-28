@@ -895,7 +895,7 @@ export default function VisitSummaryScreen({ activeSite, onNavigate }) {
         </div>
 
         {/* Dual Signatures Capture Section (Workbook Rows 56-60) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
           {/* Service Engineer Signature */}
           <div>
             <div style={{ marginBottom: '8px' }}>

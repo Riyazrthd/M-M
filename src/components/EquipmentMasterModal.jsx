@@ -178,28 +178,34 @@ export default function EquipmentMasterModal({ isOpen, onClose, onEquipmentMaste
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.55)',
-      backdropFilter: 'blur(3px)',
-      zIndex: 120,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '16px'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '820px',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '14px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        maxHeight: '92vh',
+    <div 
+      className="mobile-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        backdropFilter: 'blur(3px)',
+        zIndex: 120,
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px'
+      }}
+    >
+      <div 
+        className="mobile-modal-dialog"
+        style={{
+          width: '100%',
+          maxWidth: '820px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '14px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
         {/* Header */}
         <div style={{
           display: 'flex',

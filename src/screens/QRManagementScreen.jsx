@@ -503,8 +503,8 @@ export default function QRManagementScreen({ onNavigate, onRegisterWithQR, onSel
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+        <div className="mobile-table-scroll" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#0F172A', color: '#FFFFFF' }}>
                 <th style={{ padding: '10px 12px', border: '1px solid #334155', width: '130px' }}>
@@ -746,24 +746,30 @@ export default function QRManagementScreen({ onNavigate, onRegisterWithQR, onSel
           Allows generating 50, 100, 200, 500 or custom quantity in advance
           ==================================================================== */}
       {isGenerateModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '10px',
-            maxWidth: '560px',
-            width: '100%',
-            overflow: 'hidden',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
-          }}>
+        <div 
+          className="mobile-modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}
+        >
+          <div 
+            className="mobile-modal-dialog"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '10px',
+              maxWidth: '560px',
+              width: '100%',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+            }}
+          >
             {/* Modal Header */}
             <div style={{
               backgroundColor: '#A80018',

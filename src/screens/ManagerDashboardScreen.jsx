@@ -3058,6 +3058,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
 
         return (
           <div
+            className="mobile-modal-overlay"
             style={{
               position: 'fixed',
               inset: 0,
@@ -3072,6 +3073,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             onClick={() => setExtinguisherView(null)}
           >
             <div
+              className="mobile-modal-dialog"
               style={{
                 backgroundColor: '#FFF',
                 borderRadius: '16px',
@@ -3319,8 +3321,8 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                     </div>
 
                     {/* Table */}
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                    <div className="mobile-table-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', fontSize: '12.5px' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${DS.border}` }}>
                             <th style={{ padding: '10px 14px', textAlign: 'center', width: '45px', color: '#64748B', fontWeight: 600 }}>#</th>
@@ -3824,8 +3826,8 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                     </div>
 
                     {/* Detailed Report Table (All Assets for this Client) */}
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+                    <div className="mobile-table-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#F8FAFC', borderBottom: `1px solid ${DS.border}` }}>
                             <th style={{ padding: '9px 10px', textAlign: 'center', width: '38px', color: '#64748B' }}>#</th>

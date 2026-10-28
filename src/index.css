@@ -812,3 +812,127 @@ textarea {
     display: flex !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   16. Mobile-First Responsive Framework & Safe Area Optimization
+   -------------------------------------------------------------------------- */
+
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+/* Safe area support for iOS and Android gesture bars */
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 1024px) {
+  .app-content-body {
+    padding: 12px 12px calc(80px + env(safe-area-inset-bottom, 0px)) 12px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content-body {
+    padding: 8px 8px calc(76px + env(safe-area-inset-bottom, 0px)) 8px !important;
+  }
+  .hide-on-mobile {
+    display: none !important;
+  }
+  .show-on-mobile {
+    display: flex !important;
+  }
+  .mobile-w-full {
+    width: 100% !important;
+  }
+}
+
+/* Prevent unwanted browser auto-zoom on iOS inputs */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth Touch Scrolling */
+.table-responsive, .mobile-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile Modal Bottom Sheet Adaptation */
+@media (max-width: 768px) {
+  .mobile-modal-overlay {
+    padding: 6px !important;
+    align-items: flex-end !important;
+  }
+  .mobile-modal-dialog {
+    max-height: 94vh !important;
+    border-radius: 14px 14px 0 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Client Table Desktop vs Mobile Card Switch */
+.client-table-desktop-header {
+  display: grid;
+  grid-template-columns: 36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 18px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.client-row-desktop {
+  display: grid;
+  grid-template-columns: 36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-row-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .client-table-desktop-header {
+    display: none !important;
+  }
+  .client-row-desktop {
+    display: none !important;
+  }
+  .client-row-mobile {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .site-list-toolbar {
+    width: 100% !important;
+  }
+  .site-list-search-box {
+    width: 100% !important;
+    order: 10 !important;
+  }
+  .command-palette-overlay {
+    padding: 14px 8px !important;
+  }
+  .command-palette-dialog {
+    max-height: 90vh !important;
+  }
+}
+

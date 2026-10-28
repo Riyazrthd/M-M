@@ -942,7 +942,7 @@ export default function DigitalChecklistScreen({
         {/* Rows 3-4: Document Control Copy Metadata Table */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           backgroundColor: '#F8FAFC',
           borderBottom: '1.5px solid #0F172A',
           fontSize: '0.78rem'
@@ -986,7 +986,7 @@ export default function DigitalChecklistScreen({
         {/* Rows 6-9: Client & Contract Details Table */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           backgroundColor: '#FFFFFF',
           borderBottom: '1.5px solid #0F172A',
           fontSize: '0.8rem'

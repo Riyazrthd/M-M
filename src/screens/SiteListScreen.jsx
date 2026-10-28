@@ -321,7 +321,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
           </div>
 
           {/* Right Action Icons & Search Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div className="site-list-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             
             {/* Filter Funnel Icon with Dropdown */}
             <div style={{ position: 'relative' }}>
@@ -391,7 +391,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
             </div>
 
             {/* Search clients... Input */}
-            <div style={{
+            <div className="site-list-search-box" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -512,9 +512,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
         </div>
 
         {/* Table Column Headers */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px',
+        <div className="client-table-desktop-header" style={{
           alignItems: 'center',
           gap: '8px',
           padding: '4px 18px',
@@ -612,10 +610,6 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 borderRadius: '12px',
                 border: '1px solid #EAECF0',
                 padding: '13px 18px',
-                display: 'grid',
-                gridTemplateColumns: '36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px',
-                alignItems: 'center',
-                gap: '8px',
                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
                 transition: 'background-color 0.1s ease, border-color 0.1s ease',
                 cursor: 'pointer'
@@ -630,171 +624,391 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
               }}
               onClick={() => handleViewClient(site)}
             >
-              {/* Row Checkbox */}
-              <div onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => handleToggleSelectOne(site.id)}
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    accentColor: '#064E3B'
-                  }}
-                />
-              </div>
-
-              {/* Client Name with Building Icon & AMC Sub-details (PO removed from below name) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                <div style={{
-                  color: '#4B5563',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Building2 size={18} strokeWidth={1.8} />
+              {/* DESKTOP ROW VIEW (> 768px) */}
+              <div className="client-row-desktop">
+                {/* Row Checkbox */}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSelectOne(site.id)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      accentColor: '#064E3B'
+                    }}
+                  />
                 </div>
-                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+
+                {/* Client Name with Building Icon & AMC Sub-details */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
                   <div style={{
-                    fontSize: '0.92rem',
-                    fontWeight: 700,
-                    color: '#111827',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {clientTitle}
-                  </div>
-                  <div style={{
-                    fontSize: '0.72rem',
-                    color: '#536174',
+                    color: '#4B5563',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    marginTop: '2px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                    justifyContent: 'center',
+                    flexShrink: 0
                   }}>
-                    <span style={{ color: '#00875A', fontWeight: 600 }}>
-                      {site.amcType || site.frequency || 'Quarterly'} ({site.noOfVisits || 4} Visits)
-                    </span>
-                    <span style={{ color: '#D1D5DB' }}>•</span>
-                    <span style={{ color: '#788494' }}>
-                      Exp: {site.amcExpiryDate || site.contractPeriod || '—'}
-                    </span>
+                    <Building2 size={18} strokeWidth={1.8} />
+                  </div>
+                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                    <div style={{
+                      fontSize: '0.92rem',
+                      fontWeight: 700,
+                      color: '#111827',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {clientTitle}
+                    </div>
+                    <div style={{
+                      fontSize: '0.72rem',
+                      color: '#536174',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '2px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      <span style={{ color: '#00875A', fontWeight: 600 }}>
+                        {site.amcType || site.frequency || 'Quarterly'} ({site.noOfVisits || 4} Visits)
+                      </span>
+                      <span style={{ color: '#D1D5DB' }}>•</span>
+                      <span style={{ color: '#788494' }}>
+                        Exp: {site.amcExpiryDate || site.contractPeriod || '—'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Contact No */}
-              <div style={{
-                fontSize: '0.86rem',
-                color: '#374151',
-                whiteSpace: 'nowrap'
-              }}>
-                {site.contactPhone || '—'}
-              </div>
+                {/* Contact No */}
+                <div style={{
+                  fontSize: '0.86rem',
+                  color: '#374151',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {site.contactPhone || '—'}
+                </div>
 
-              {/* Email ID */}
-              <div style={{
-                fontSize: '0.86rem',
-                color: '#4B5563',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {site.email || '—'}
-              </div>
-
-              {/* PO Number (shifted from below client name, replacing Tax ID) */}
-              <div
-                style={{
-                  fontSize: '0.82rem',
-                  color: '#111827',
-                  fontFamily: 'monospace',
-                  fontWeight: 600,
+                {/* Email ID */}
+                <div style={{
+                  fontSize: '0.86rem',
+                  color: '#4B5563',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
-                }}
-                title={site.poNumber || '—'}
-              >
-                {site.poNumber || '—'}
+                }}>
+                  {site.email || '—'}
+                </div>
+
+                {/* PO Number */}
+                <div
+                  style={{
+                    fontSize: '0.82rem',
+                    color: '#111827',
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                  title={site.poNumber || '—'}
+                >
+                  {site.poNumber || '—'}
+                </div>
+
+                {/* Spacer Column */}
+                <div />
+
+                {/* Actions Column (Eye, Pencil, Red Trash) */}
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '12px'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={(e) => handleOpenView(site, e)}
+                    style={{
+                      color: '#374151',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 'unset'
+                    }}
+                    title="View Client Details & AMC Dossier"
+                  >
+                    <Eye size={17} />
+                  </button>
+
+                  <button
+                    onClick={(e) => handleOpenEdit(site, e)}
+                    style={{
+                      color: '#374151',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 'unset'
+                    }}
+                    title="Edit Client Information"
+                  >
+                    <Pencil size={16} />
+                  </button>
+
+                  <button
+                    onClick={(e) => handleOpenDelete(site, e)}
+                    style={{
+                      color: '#DC2626',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 'unset'
+                    }}
+                    title="Delete Client"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
-              {/* Spacer Column */}
-              <div />
+              {/* MOBILE CARD VIEW (<= 768px) */}
+              <div className="client-row-mobile">
+                {/* Top Row: Checkbox, Client Name, AMC Frequency Badge */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectOne(site.id)}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          accentColor: '#064E3B'
+                        }}
+                      />
+                    </div>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F3F4F6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      color: '#374151'
+                    }}>
+                      <Building2 size={16} strokeWidth={2} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        fontSize: '0.94rem',
+                        fontWeight: 700,
+                        color: '#111827',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {clientTitle}
+                      </div>
+                      <div style={{
+                        fontSize: '0.72rem',
+                        color: '#00875A',
+                        fontWeight: 600,
+                        marginTop: '1px'
+                      }}>
+                        {site.amcType || site.frequency || 'Quarterly'} • {site.noOfVisits || 4} Visits
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Actions Column (Eye, Pencil, Red Trash) */}
-              <div 
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: '12px'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Eye Icon (View Full Client Details Dossier) */}
-                <button
-                  onClick={(e) => handleOpenView(site, e)}
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: '4px',
+                    backgroundColor: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #DBEAFE',
+                    flexShrink: 0
+                  }}>
+                    {site.amcStatus || 'Active'}
+                  </span>
+                </div>
+
+                {/* Details Grid (Phone, PO, Email) */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  gap: '6px 10px',
+                  padding: '8px 10px',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '8px',
+                  border: '1px solid #F1F5F9',
+                  fontSize: '0.76rem'
+                }}>
+                  <div>
+                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.68rem' }}>Contact Phone</span>
+                    <a
+                      href={`tel:${site.contactPhone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: '#0284C7',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginTop: '1px'
+                      }}
+                    >
+                      <Phone size={11} /> {site.contactPhone || '—'}
+                    </a>
+                  </div>
+
+                  <div>
+                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.68rem' }}>PO Number</span>
+                    <span style={{
+                      color: '#111827',
+                      fontWeight: 600,
+                      fontFamily: 'monospace',
+                      display: 'block',
+                      marginTop: '1px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {site.poNumber || '—'}
+                    </span>
+                  </div>
+
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.68rem' }}>Email Address</span>
+                    <span style={{
+                      color: '#475569',
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {site.email || '—'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bottom Row Actions */}
+                <div
                   style={{
-                    color: '#374151',
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 'unset'
+                    justifyContent: 'space-between',
+                    paddingTop: '4px'
                   }}
-                  title="View Client Details & AMC Dossier"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Eye size={17} />
-                </button>
+                  <button
+                    onClick={() => handleViewClient(site)}
+                    style={{
+                      height: '34px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      backgroundColor: '#064E3B',
+                      color: '#FFFFFF',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span>View Assets</span>
+                    <ArrowRight size={13} />
+                  </button>
 
-                {/* Pencil Icon (Edit) */}
-                <button
-                  onClick={(e) => handleOpenEdit(site, e)}
-                  style={{
-                    color: '#374151',
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 'unset'
-                  }}
-                  title="Edit Client Information"
-                >
-                  <Pencil size={16} />
-                </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      onClick={(e) => handleOpenView(site, e)}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
+                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                      title="View Client Dossier"
+                    >
+                      <Eye size={16} />
+                    </button>
 
-                {/* Red Trash Icon (Delete) */}
-                <button
-                  onClick={(e) => handleOpenDelete(site, e)}
-                  style={{
-                    color: '#DC2626',
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 'unset'
-                  }}
-                  title="Delete Client"
-                >
-                  <Trash2 size={16} />
-                </button>
+                    <button
+                      onClick={(e) => handleOpenEdit(site, e)}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
+                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                      title="Edit Client Information"
+                    >
+                      <Pencil size={15} />
+                    </button>
+
+                    <button
+                      onClick={(e) => handleOpenDelete(site, e)}
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '6px',
+                        border: '1px solid #FEE2E2',
+                        backgroundColor: '#FEF2F2',
+                        color: '#DC2626',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                      title="Delete Client"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           );

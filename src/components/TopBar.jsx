@@ -78,19 +78,22 @@ export default function TopBar({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <h1 style={{
-            fontSize: '15px',
+            fontSize: '14.5px',
             fontWeight: 700,
             color: '#111827',
             margin: 0,
             whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '180px',
             letterSpacing: '-0.01em'
           }}>
             {SCREEN_TITLES[currentScreen] || 'Indus AMC System'}
           </h1>
           <span style={{
-            fontSize: '10.5px',
+            fontSize: '10px',
             fontWeight: 700,
-            padding: '2px 6px',
+            padding: '2px 5px',
             borderRadius: '4px',
             backgroundColor: '#EFF6FF',
             color: '#2563EB',
@@ -101,8 +104,8 @@ export default function TopBar({
           }}>
             Phase 1
           </span>
-          <span style={{
-            fontSize: '11.5px',
+          <span className="hide-on-mobile" style={{
+            fontSize: '11px',
             color: '#64748B',
             fontWeight: 500,
             whiteSpace: 'nowrap',
@@ -123,8 +126,8 @@ export default function TopBar({
         onClick={onOpenCommandPalette}
         style={{
           flex: '1 1 auto',
-          maxWidth: '280px',
-          minWidth: '120px',
+          maxWidth: '260px',
+          minWidth: '60px',
           height: '32px',
           backgroundColor: '#F8FAFC',
           border: '1px solid #E2E8F0',
@@ -132,7 +135,7 @@ export default function TopBar({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 9px',
+          padding: '0 8px',
           cursor: 'pointer',
           transition: 'all 0.15s ease',
           boxSizing: 'border-box',
@@ -156,11 +159,11 @@ export default function TopBar({
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            Search assets, SOPs...
+            Search...
           </span>
         </div>
 
-        <div style={{
+        <div className="hide-on-mobile" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '2px',
@@ -179,7 +182,7 @@ export default function TopBar({
       </div>
 
       {/* Right: Network Status, Cloud & Notifications */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
         {/* Compact Network Status Badge */}
         <NetworkStatusBadge />
 
@@ -189,12 +192,12 @@ export default function TopBar({
           style={{
             height: '32px',
             minHeight: '32px',
-            padding: '0 9px',
+            padding: '0 8px',
             borderRadius: '6px',
             backgroundColor: '#F0FDF4',
             border: '1px solid #BBF7D0',
             color: '#166534',
-            fontSize: '12px',
+            fontSize: '11.5px',
             fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',

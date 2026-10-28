@@ -143,29 +143,35 @@ export default function SupabaseBackupModal({ isOpen, onClose }) {
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(17, 24, 39, 0.65)',
-      backdropFilter: 'blur(3px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 100,
-      padding: '16px'
-    }}>
-      <div style={{
-        backgroundColor: '#FFFFFF',
-        borderRadius: '12px',
-        width: '100%',
-        maxWidth: '780px',
-        maxHeight: '90vh',
+    <div 
+      className="mobile-modal-overlay"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(17, 24, 39, 0.65)',
+        backdropFilter: 'blur(3px)',
         display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #E1E5E9',
-        overflow: 'hidden'
-      }}>
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100,
+        padding: '16px'
+      }}
+    >
+      <div 
+        className="mobile-modal-dialog"
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          width: '100%',
+          maxWidth: '780px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #E1E5E9',
+          overflow: 'hidden'
+        }}
+      >
         {/* Modal Header */}
         <div style={{
           padding: '18px 24px',

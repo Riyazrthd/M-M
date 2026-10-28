@@ -66,6 +66,7 @@ export default function CommandPaletteModal({ isOpen, onClose, onNavigate, onSel
 
   return (
     <div 
+      className="command-palette-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -81,6 +82,7 @@ export default function CommandPaletteModal({ isOpen, onClose, onNavigate, onSel
       onClick={onClose}
     >
       <div 
+        className="command-palette-dialog"
         style={{
           width: '100%',
           maxWidth: '640px',
