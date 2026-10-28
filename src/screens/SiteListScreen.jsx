@@ -460,7 +460,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
         {/* Table Column Headers */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '36px minmax(200px, 2.5fr) minmax(130px, 1.4fr) minmax(180px, 2fr) minmax(90px, 1fr) 30px 100px',
+          gridTemplateColumns: '36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px',
           alignItems: 'center',
           gap: '8px',
           padding: '4px 18px',
@@ -489,7 +489,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
           <div>CLIENT</div>
           <div>CONTACT NO</div>
           <div>EMAIL ID</div>
-          <div>TAX ID</div>
+          <div>PO NUMBER</div>
           <div style={{ textAlign: 'center' }}>+</div>
           <div style={{ textAlign: 'right' }}>ACTIONS</div>
         </div>
@@ -559,7 +559,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 border: '1px solid #EAECF0',
                 padding: '13px 18px',
                 display: 'grid',
-                gridTemplateColumns: '36px minmax(200px, 2.5fr) minmax(130px, 1.4fr) minmax(180px, 2fr) minmax(90px, 1fr) 30px 100px',
+                gridTemplateColumns: '36px minmax(200px, 2.3fr) minmax(130px, 1.3fr) minmax(160px, 1.7fr) minmax(150px, 1.6fr) 20px 100px',
                 alignItems: 'center',
                 gap: '8px',
                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
@@ -592,7 +592,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 />
               </div>
 
-              {/* Client Name with Building Icon & AMC Sub-details */}
+              {/* Client Name with Building Icon & AMC Sub-details (PO removed from below name) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
                 <div style={{
                   color: '#4B5563',
@@ -625,10 +625,6 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
                   }}>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#111827' }}>
-                      PO: {site.poNumber || '—'}
-                    </span>
-                    <span style={{ color: '#D1D5DB' }}>•</span>
                     <span style={{ color: '#00875A', fontWeight: 600 }}>
                       {site.amcType || site.frequency || 'Quarterly'} ({site.noOfVisits || 4} Visits)
                     </span>
@@ -660,14 +656,20 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 {site.email || '—'}
               </div>
 
-              {/* Tax ID */}
-              <div style={{
-                fontSize: '0.82rem',
-                color: '#6B7280',
-                fontFamily: 'monospace',
-                whiteSpace: 'nowrap'
-              }}>
-                {site.taxId || ''}
+              {/* PO Number (shifted from below client name, replacing Tax ID) */}
+              <div
+                style={{
+                  fontSize: '0.82rem',
+                  color: '#111827',
+                  fontFamily: 'monospace',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+                title={site.poNumber || '—'}
+              >
+                {site.poNumber || '—'}
               </div>
 
               {/* Spacer Column */}
