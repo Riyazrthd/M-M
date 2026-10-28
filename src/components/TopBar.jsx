@@ -3,7 +3,8 @@ import {
   Search, 
   Menu, 
   Bell, 
-  Cloud
+  Cloud,
+  Calendar
 } from 'lucide-react';
 import NetworkStatusBadge from './NetworkStatusBadge';
 
@@ -99,6 +100,20 @@ export default function TopBar({
             lineHeight: 1.2
           }}>
             Phase 1
+          </span>
+          <span style={{
+            fontSize: '11.5px',
+            color: '#64748B',
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginLeft: '2px'
+          }}>
+            <span style={{ color: '#CBD5E1' }}>•</span>
+            <Calendar size={12} color="#94A3B8" />
+            <span>{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </span>
         </div>
       </div>

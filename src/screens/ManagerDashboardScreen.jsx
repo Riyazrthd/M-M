@@ -329,12 +329,10 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const siteName = p => p.siteId === 'AIL-U4' ? 'Aarti Industries Ltd' : p.siteId === 'ATL-C2' ? 'Atul Ltd' : p.siteId === 'DNL-NDS' ? 'Deepak Nitrite' : 'L&T Hazira';
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:'18px' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
 
       {/* Global keyframes */}
       <style>{`
@@ -359,19 +357,22 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         .chip-btn:hover { opacity:.80; }
       `}</style>
 
-      {/* ═══ 1. GREETING + ACTION ROW ═══════════════════════════════ */}
+      {/* ═══ 1. DATE & ACTION BAR ════════════════════════════════════ */}
       <div className="dash-row" style={{
-        display:'flex', justifyContent:'space-between', alignItems:'flex-start',
-        flexWrap:'wrap', gap:'14px', paddingBottom:'2px'
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        flexWrap:'wrap', gap:'12px', paddingBottom:'2px'
       }}>
-        <div>
-          <h2 style={{ fontSize:'1.6rem', fontWeight:800, color:DS.textPrimary, margin:'0 0 4px 0', letterSpacing:'-0.035em' }}>
-            {greeting}, {user.name.split(' ')[0]} 👋
-          </h2>
-          <p style={{ fontSize:'13px', color:DS.textSec, margin:0 }}>
-            Executive Operations · Gujarat Industrial AMC Contracts ·{' '}
-            {new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
-          </p>
+        {/* Date Display */}
+        <div style={{
+          display:'inline-flex',
+          alignItems:'center',
+          gap:'6px',
+          fontSize:'13px',
+          fontWeight:500,
+          color:'#6B7280'
+        }}>
+          <Calendar size={15} color="#9CA3AF" />
+          <span>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
