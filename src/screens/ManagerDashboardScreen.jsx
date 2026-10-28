@@ -740,36 +740,38 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             onClick={() => setModalCategory(m.category)}
             title={`Click to open real ${m.label} records`}
             style={{
-              backgroundColor: DS.cardBg, 
-              border: `1px solid ${DS.border}`,
-              borderRadius: '9px', 
+              backgroundColor: '#F4F5F5', 
+              border: '1px solid #ECECEC',
+              borderRadius: '10px', 
               padding: '9px 12px', 
-              boxShadow: DS.shadowSm,
+              boxShadow: 'none',
               cursor: 'pointer',
               transition: 'all 0.16s ease',
               position: 'relative'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#93C5FD';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 14px rgba(37,99,235,0.12)';
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
+              e.currentTarget.style.borderColor = '#CBD5E1';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = DS.border;
+              e.currentTarget.style.backgroundColor = '#F4F5F5';
+              e.currentTarget.style.borderColor = '#ECECEC';
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = DS.shadowSm;
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-              <p style={{ fontSize: '10.5px', fontWeight: 600, color: DS.textMuted, margin: 0 }}>
+              <p style={{ fontSize: '11px', fontWeight: 500, color: '#6B7280', margin: 0 }}>
                 {m.label}
               </p>
-              <ExternalLink size={10} color="#9CA3AF" style={{ opacity: 0.6 }}/>
+              <ExternalLink size={11} color="#9CA3AF" style={{ opacity: 0.6 }}/>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: DS.textPrimary, letterSpacing: '-0.02em' }}>{m.value}</div>
-                <div style={{ fontSize: '10px', color: m.color, fontWeight: 600 }}>{m.sub}</div>
+                <div style={{ fontSize: '15px', fontWeight: 500, color: '#363D42', letterSpacing: '-0.015em', fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
+                <div style={{ fontSize: '10.5px', color: m.color, fontWeight: 400 }}>{m.sub}</div>
               </div>
               <Sparkline points={m.pts} color={m.color} width={42} height={16}/>
             </div>
@@ -803,7 +805,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
               <h3 style={{
                 margin: 0,
                 fontSize: '14px',
-                fontWeight: 600,
+                fontWeight: 500,
                 color: '#363D42',
                 fontFamily: "'Poppins', 'Inter', -apple-system, sans-serif",
                 whiteSpace: 'nowrap',
@@ -959,7 +961,7 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
               <h3 style={{
                 margin: 0,
                 fontSize: '14px',
-                fontWeight: 600,
+                fontWeight: 500,
                 color: '#363D42',
                 fontFamily: "'Poppins', 'Inter', -apple-system, sans-serif",
                 whiteSpace: 'nowrap',
@@ -1151,10 +1153,10 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                     <div>
-                      <div style={{ fontSize:'12.5px', fontWeight:700, color:DS.textPrimary }}>{site.name}</div>
+                      <div style={{ fontSize:'13px', fontWeight:500, color:DS.textPrimary }}>{site.name}</div>
                       <div style={{ fontSize:'11px', color:DS.textMuted }}>{site.city}</div>
                     </div>
-                    <span style={{ fontSize:'22px', fontWeight:800, color:col, letterSpacing:'-0.03em' }}>{pct}%</span>
+                    <span style={{ fontSize:'20px', fontWeight:500, color:col, letterSpacing:'-0.02em', fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
                     <div style={{ position:'relative', flexShrink:0 }}>
