@@ -26,33 +26,37 @@ if (fs.existsSync('404.html')) {
   fs.copyFileSync('404.html', path.join(distQrPath, 'index.html'));
 }
 
-// 2. Ensure dist has docs/ subfolder
-const distDocsPath = path.join(distPath, 'docs');
-if (fs.existsSync(distDocsPath)) {
-  fs.rmSync(distDocsPath, { recursive: true, force: true });
+// 2. Ensure .nojekyll is present everywhere to prevent GitHub Pages Jekyll processing
+fs.writeFileSync('.nojekyll', '');
+fs.writeFileSync(path.join(distPath, '.nojekyll'), '');
+
+// 3. Sync to docs/ directory BEFORE creating any subfolders in dist
+console.log('[Build] Syncing to docs folder...');
+if (fs.existsSync(docsPath)) {
+  fs.rmSync(docsPath, { recursive: true, force: true });
 }
-fs.mkdirSync(distDocsPath, { recursive: true });
+fs.cpSync(distPath, docsPath, { recursive: true });
+fs.writeFileSync(path.join(docsPath, '.nojekyll'), '');
+
+// 4. Create backward-compatible docs/ alias inside dist for legacy URLs
+const distDocsPath = path.join(distPath, 'docs');
+if (!fs.existsSync(distDocsPath)) {
+  fs.mkdirSync(distDocsPath, { recursive: true });
+}
 fs.copyFileSync(path.join(distPath, 'index.html'), path.join(distDocsPath, 'index.html'));
 if (fs.existsSync('404.html')) {
   fs.copyFileSync('404.html', path.join(distDocsPath, '404.html'));
 }
 fs.cpSync(path.join(distPath, 'assets'), path.join(distDocsPath, 'assets'), { recursive: true });
 
-// 3. Sync to docs/ directory
-console.log('[Build] Syncing to docs folder...');
-if (fs.existsSync(docsPath)) {
-  fs.rmSync(docsPath, { recursive: true, force: true });
-}
-fs.cpSync(distPath, docsPath, { recursive: true });
-
-// 4. Sync production assets to root assets/
+// 5. Sync production assets to root assets/
 console.log('[Build] Syncing production assets to root assets folder...');
 if (fs.existsSync(rootAssetsPath)) {
   fs.rmSync(rootAssetsPath, { recursive: true, force: true });
 }
 fs.cpSync(path.join(distPath, 'assets'), rootAssetsPath, { recursive: true });
 
-// 5. CRITICAL: Replace root index.html with the compiled production bundle
+// 6. CRITICAL: Replace root index.html with the compiled production bundle
 // This guarantees that if GitHub Pages deploys from main branch root (/),
 // it serves the compiled JavaScript bundle and never gets stuck on loading!
 console.log('[Build] Writing compiled production bundle to root index.html...');
