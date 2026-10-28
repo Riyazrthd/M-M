@@ -1,0 +1,22 @@
+{
+  "name": "Indus Fire Safety — Digital AMC Inspection System",
+  "short_name": "IFS AMC",
+  "description": "Indus Fire Safety Private Limited Digital AMC Inspection and Audit System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/indus_fire_safety_logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
