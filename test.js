@@ -26,7 +26,12 @@ global.window = {
   open: () => ({ document: { write() {}, close() {} }, focus() {} }),
   document: { createElement: () => ({ setAttribute() {}, appendChild() {}, click() {} }) }
 };
-global.CustomEvent = class {};
+global.CustomEvent = class {
+  constructor(type, params = {}) {
+    this.type = type;
+    this.detail = params.detail;
+  }
+};
 
 async function runAllTests() {
   await import('./src/utils/test_phase1_acceptance.js');
@@ -44,6 +49,9 @@ async function runAllTests() {
   console.log('\n\n');
   const allAssetsTests = await import('./src/utils/test_all_assets_inventory.js');
   await allAssetsTests.runAllAssetsInventoryTests();
+  console.log('\n\n');
+  const cloudSyncTests = await import('./src/utils/test_instant_cloud_sync.js');
+  await cloudSyncTests.runInstantCloudSyncTests();
 }
 
 runAllTests();

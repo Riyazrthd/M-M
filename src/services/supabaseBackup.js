@@ -731,7 +731,8 @@ export async function pushDataToSupabase(url, anonKey) {
       inspected_positions: s.inspectedPositions || 0,
       status: s.status || 'Scheduled',
       scheduled_date: s.scheduledDate,
-      applicable_checklists: s.applicableChecklists || ['CL-11', 'CL-03']
+      applicable_checklists: s.applicableChecklists || ['CL-11', 'CL-03'],
+      updated_at: new Date().toISOString()
     }));
 
     const resSites = await fetch(`${cleanUrl}/rest/v1/sites`, {
@@ -804,7 +805,8 @@ export async function pushDataToSupabase(url, anonKey) {
         history: p.history || [],
         inspection_history: p.inspectionHistory || [],
         notes: p.notes || '',
-        status: p.status || 'Active'
+        status: p.status || 'Active',
+        updated_at: new Date().toISOString()
       };
     });
 
@@ -843,7 +845,8 @@ export async function pushDataToSupabase(url, anonKey) {
         pending_points: v.pendingPoints || '',
         technician_signature: v.technicianSignature,
         client_signature: v.clientSignature,
-        completed_at: v.completedAt
+        completed_at: v.completedAt,
+        updated_at: new Date().toISOString()
       };
     });
 
@@ -940,6 +943,15 @@ export async function pullDataFromSupabase(url, anonKey) {
     // 5. Fetch Technicians
     const resTechs = await fetch(`${cleanUrl}/rest/v1/plant_technicians?select=*`, { headers });
     const technicians = resTechs.ok ? await resTechs.json() : [];
+
+    // 6. Fetch QR Registry
+    let qrRegistry = [];
+    try {
+      const resQr = await fetch(`${cleanUrl}/rest/v1/qr_registry?select=*`, { headers });
+      if (resQr.ok) qrRegistry = await resQr.json();
+    } catch (e) {
+      console.warn('QR registry pull notice:', e);
+    }
 
     // Transform and store locally
     if (Array.isArray(sites) && sites.length > 0) {
@@ -1050,6 +1062,55 @@ export async function pullDataFromSupabase(url, anonKey) {
       localStorage.setItem('ifspl_amc_plant_technicians', JSON.stringify(transformedTechs));
     }
 
+    if (Array.isArray(qrRegistry) && qrRegistry.length > 0) {
+      const transformedQr = qrRegistry.map(qr => ({
+        id: qr.id,
+        token: qr.token,
+        displayNo: qr.display_no,
+        seqNumber: qr.seq_number || 0,
+        batchId: qr.batch_id,
+        batchLabel: qr.batch_label,
+        generatedDate: qr.generated_date,
+        generatedTime: qr.generated_time,
+        generatedAt: qr.generated_at,
+        generatedBy: qr.generated_by,
+        assignmentStatus: qr.assignment_status,
+        linkedAssetId: qr.linked_asset_id,
+        linkedPositionId: qr.linked_position_id,
+        linkedAssetName: qr.linked_asset_name,
+        assignedDate: qr.assigned_date,
+        assignedBy: qr.assigned_by,
+        lifecycleStatus: qr.lifecycle_status
+      }));
+      localStorage.setItem('ifspl_amc_qr_registry', JSON.stringify(transformedQr));
+    }
+
+    // Record last sync timestamp
+    saveSupabaseConfig({ lastSyncedAt: new Date().toISOString() });
+
+    // Notify UI components that data has updated silently in background
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('ifspl:cloud_synced', { 
+          detail: { 
+            restored: {
+              sites: sites.length,
+              positions: positions.length,
+              visits: visits.length,
+              equipmentMaster: equipmentMaster.length,
+              technicians: technicians.length,
+              qrRegistry: qrRegistry.length
+            }
+          } 
+        }));
+        window.dispatchEvent(new CustomEvent('ifspl:sites_updated'));
+        window.dispatchEvent(new CustomEvent('ifspl:positions_updated'));
+        window.dispatchEvent(new CustomEvent('ifspl:visits_updated'));
+        window.dispatchEvent(new CustomEvent('ifspl:qr_registry_updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+      } catch (e) {}
+    }
+
     return {
       success: true,
       restored: {
@@ -1057,7 +1118,8 @@ export async function pullDataFromSupabase(url, anonKey) {
         positions: positions.length,
         visits: visits.length,
         equipmentMaster: equipmentMaster.length,
-        technicians: technicians.length
+        technicians: technicians.length,
+        qrRegistry: qrRegistry.length
       }
     };
   } catch (err) {
@@ -1133,4 +1195,215 @@ export async function fetchPositionFromSupabase(queryCode) {
   }
   return null;
 }
+
+// ----------------------------------------------------------------------------
+// INSTANT CLOUD SYNC & SILENT BACKGROUND REFRESH ENGINE
+// ----------------------------------------------------------------------------
+
+/**
+ * Lightweight check to see if remote Supabase database has changes newer than lastSyncedAt.
+ * Queries only 1 row (updated_at) per table instead of downloading whole collections.
+ */
+export async function checkCloudHasUpdates(url, anonKey, lastSyncedAt) {
+  if (!url || !anonKey) return false;
+  const cleanUrl = url.trim().replace(/\/+$/, '');
+  const cleanKey = anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    // If device has never synced before, it needs fresh data
+    if (!lastSyncedAt) return true;
+    const lastSyncTime = new Date(lastSyncedAt).getTime();
+
+    // Check positions table
+    const resPos = await fetch(`${cleanUrl}/rest/v1/positions?select=updated_at&order=updated_at.desc&limit=1`, { headers });
+    if (resPos.ok) {
+      const rows = await resPos.json();
+      if (Array.isArray(rows) && rows[0]?.updated_at) {
+        if (new Date(rows[0].updated_at).getTime() > lastSyncTime) return true;
+      }
+    }
+
+    // Check sites table
+    const resSites = await fetch(`${cleanUrl}/rest/v1/sites?select=updated_at&order=updated_at.desc&limit=1`, { headers });
+    if (resSites.ok) {
+      const rows = await resSites.json();
+      if (Array.isArray(rows) && rows[0]?.updated_at) {
+        if (new Date(rows[0].updated_at).getTime() > lastSyncTime) return true;
+      }
+    }
+
+    // Check visits table
+    const resVisits = await fetch(`${cleanUrl}/rest/v1/visits?select=updated_at&order=updated_at.desc&limit=1`, { headers });
+    if (resVisits.ok) {
+      const rows = await resVisits.json();
+      if (Array.isArray(rows) && rows[0]?.updated_at) {
+        if (new Date(rows[0].updated_at).getTime() > lastSyncTime) return true;
+      }
+    }
+  } catch (err) {
+    // Silent network failure during background check
+  }
+  return false;
+}
+
+let debouncePushTimer = null;
+let isPushingToCloud = false;
+let pendingPushAgain = false;
+
+/**
+ * Triggers instant debounced outbound push to Supabase Cloud whenever local state changes.
+ * Debounced to 300ms so rapid edits or batch modifications do not flood the network.
+ */
+export function triggerInstantCloudSync(reason = 'data_change') {
+  if (typeof window === 'undefined') return;
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey || !cfg.autoSync) return;
+
+  if (debouncePushTimer) {
+    clearTimeout(debouncePushTimer);
+  }
+
+  // Set 300ms debounce
+  debouncePushTimer = setTimeout(async () => {
+    if (isPushingToCloud) {
+      pendingPushAgain = true;
+      return;
+    }
+
+    isPushingToCloud = true;
+    try {
+      window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+        detail: { status: 'syncing', message: 'Syncing to cloud...', reason }
+      }));
+
+      const res = await pushDataToSupabase(cfg.url, cfg.anonKey);
+      if (res && res.success) {
+        window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+          detail: { 
+            status: 'synced', 
+            message: 'Live Cloud ✓', 
+            stats: res.stats, 
+            timestamp: Date.now() 
+          }
+        }));
+        window.dispatchEvent(new CustomEvent('ifspl:supabase_synced', { detail: res }));
+      } else {
+        window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+          detail: { 
+            status: 'error', 
+            message: res?.error || 'Cloud sync failed',
+            timestamp: Date.now() 
+          }
+        }));
+      }
+    } catch (e) {
+      window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+        detail: { status: 'error', message: e.message || 'Network sync error', timestamp: Date.now() }
+      }));
+    } finally {
+      isPushingToCloud = false;
+      if (pendingPushAgain) {
+        pendingPushAgain = false;
+        triggerInstantCloudSync('queued_updates');
+      }
+    }
+  }, 300);
+}
+
+let isPullingFromCloud = false;
+
+/**
+ * Silently polls the cloud for remote changes and pulls them into local storage
+ * without reloading the page or interrupting active user input.
+ */
+export async function silentCheckAndSync(triggerSource = 'poll') {
+  if (typeof window === 'undefined') return;
+  if (isPullingFromCloud || isPushingToCloud) return;
+
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey || !cfg.autoSync) return;
+
+  try {
+    const hasUpdates = await checkCloudHasUpdates(cfg.url, cfg.anonKey, cfg.lastSyncedAt);
+    if (hasUpdates) {
+      isPullingFromCloud = true;
+      window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+        detail: { status: 'refreshing', message: 'Updating from cloud...' }
+      }));
+
+      const res = await pullDataFromSupabase(cfg.url, cfg.anonKey);
+      if (res && res.success) {
+        saveSupabaseConfig({ lastSyncedAt: new Date().toISOString() });
+        window.dispatchEvent(new CustomEvent('ifspl:cloud_sync_status', {
+          detail: { status: 'synced', message: 'Updated Live ✓', timestamp: Date.now() }
+        }));
+      }
+    }
+  } catch (e) {
+    // Silent fail in background
+  } finally {
+    isPullingFromCloud = false;
+  }
+}
+
+let bgSyncInitialized = false;
+
+/**
+ * Initializes the background cloud synchronization lifecycle.
+ * Listens to local mutation events, window focus, visibility changes, network reconnection,
+ * and maintains a lightweight background heartbeat poller.
+ */
+export function initBackgroundCloudSync(options = {}) {
+  if (typeof window === 'undefined' || bgSyncInitialized) return;
+  bgSyncInitialized = true;
+
+  const intervalMs = options.intervalMs || 6000;
+
+  // 1. Listen for local mutations requesting cloud sync
+  window.addEventListener('ifspl:request_cloud_sync', (e) => {
+    triggerInstantCloudSync(e.detail?.reason || 'local_mutation');
+  });
+
+  // 2. Window focus & tab visibility change -> immediate silent check
+  window.addEventListener('focus', () => {
+    silentCheckAndSync('window_focus');
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      silentCheckAndSync('visibility_change');
+    }
+  });
+
+  // 3. Online reconnect -> push local pending queue and check cloud
+  window.addEventListener('online', () => {
+    triggerInstantCloudSync('reconnect_online');
+    silentCheckAndSync('reconnect_online');
+  });
+
+  // 4. Periodic background poller
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      silentCheckAndSync('interval_active');
+    }
+  }, intervalMs);
+
+  // Background tab poller (less frequent to conserve mobile battery: every 24s)
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') {
+      silentCheckAndSync('interval_background');
+    }
+  }, intervalMs * 4);
+
+  // Initial silent check on application launch
+  setTimeout(() => {
+    silentCheckAndSync('initial_launch');
+  }, 1200);
+}
+
 

@@ -767,6 +767,29 @@ function SectionHead({ icon: Icon, iconBg='linear-gradient(135deg,#1E3A8A,#2563E
    MAIN DASHBOARD COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSelectPosition }) {
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Subscribe to background cloud sync & local mutation events for seamless live updates
+  useEffect(() => {
+    const handleRemoteUpdate = () => {
+      setRefreshTick(t => t + 1);
+    };
+    window.addEventListener('storage', handleRemoteUpdate);
+    window.addEventListener('ifspl:cloud_synced', handleRemoteUpdate);
+    window.addEventListener('ifspl:sites_updated', handleRemoteUpdate);
+    window.addEventListener('ifspl:positions_updated', handleRemoteUpdate);
+    window.addEventListener('ifspl:visits_updated', handleRemoteUpdate);
+    window.addEventListener('ifspl:data_changed', handleRemoteUpdate);
+    return () => {
+      window.removeEventListener('storage', handleRemoteUpdate);
+      window.removeEventListener('ifspl:cloud_synced', handleRemoteUpdate);
+      window.removeEventListener('ifspl:sites_updated', handleRemoteUpdate);
+      window.removeEventListener('ifspl:positions_updated', handleRemoteUpdate);
+      window.removeEventListener('ifspl:visits_updated', handleRemoteUpdate);
+      window.removeEventListener('ifspl:data_changed', handleRemoteUpdate);
+    };
+  }, []);
+
   const sites     = getSites();
   const positions = getPositions();
   const visits    = getVisits();

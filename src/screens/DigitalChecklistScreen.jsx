@@ -146,6 +146,24 @@ export default function DigitalChecklistScreen({
     setSaveSuccessNotice('');
   }, [selectedTemplateId]);
 
+  // Listen to remote cloud updates: silently refresh session records without clearing active unsaved input
+  useEffect(() => {
+    const handleRemoteVisitUpdate = () => {
+      const curSession = getChecklistSession(visit.visitId, selectedTemplateId);
+      if (curSession) {
+        setSession(curSession);
+        setSubmittedRecords(curSession.records || []);
+        setSessionStatus(curSession.status || 'In Progress');
+      }
+    };
+    window.addEventListener('ifspl:cloud_synced', handleRemoteVisitUpdate);
+    window.addEventListener('ifspl:visits_updated', handleRemoteVisitUpdate);
+    return () => {
+      window.removeEventListener('ifspl:cloud_synced', handleRemoteVisitUpdate);
+      window.removeEventListener('ifspl:visits_updated', handleRemoteVisitUpdate);
+    };
+  }, [visit?.visitId, selectedTemplateId]);
+
   // Synchronize immediately when position prop is scanned or resolved
   useEffect(() => {
     if (position) {

@@ -49,7 +49,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   const [activeClient, setActiveClient] = useState(null);
   const [viewClient, setViewClient] = useState(null);
 
-  // Sync state on storage events
+  // Sync state on storage & background cloud sync events
   useEffect(() => {
     const handleUpdate = () => {
       setSites(getSites());
@@ -57,9 +57,17 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
     };
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('ifspl:data_cleared', handleUpdate);
+    window.addEventListener('ifspl:cloud_synced', handleUpdate);
+    window.addEventListener('ifspl:sites_updated', handleUpdate);
+    window.addEventListener('ifspl:positions_updated', handleUpdate);
+    window.addEventListener('ifspl:data_changed', handleUpdate);
     return () => {
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('ifspl:data_cleared', handleUpdate);
+      window.removeEventListener('ifspl:cloud_synced', handleUpdate);
+      window.removeEventListener('ifspl:sites_updated', handleUpdate);
+      window.removeEventListener('ifspl:positions_updated', handleUpdate);
+      window.removeEventListener('ifspl:data_changed', handleUpdate);
     };
   }, []);
 

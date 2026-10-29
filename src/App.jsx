@@ -8,7 +8,7 @@ import CommandPaletteModal from './components/CommandPaletteModal';
 import TemplateMappingsModal from './components/TemplateMappingsModal';
 import EquipmentMasterModal from './components/EquipmentMasterModal';
 import SupabaseBackupModal from './components/SupabaseBackupModal';
-import { autoSyncToSupabase, fetchPositionFromSupabase } from './services/supabaseBackup';
+import { autoSyncToSupabase, fetchPositionFromSupabase, initBackgroundCloudSync } from './services/supabaseBackup';
 import { parseScannedQRToken } from './utils/qrUrlHelper';
 
 import LoginScreen from './screens/LoginScreen';
@@ -143,6 +143,7 @@ export default function App() {
 
   useEffect(() => {
     initStorage();
+    initBackgroundCloudSync({ intervalMs: 6000 });
     const sites = getSites();
     if (sites.length > 0 && !activeSite) {
       setActiveSite(sites[0]);

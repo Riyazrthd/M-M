@@ -20,6 +20,42 @@ export const STORAGE_KEYS = {
 };
 
 /**
+ * Central notification dispatcher for all data mutations.
+ * Dispatches targeted DOM events for reactive UI updates and triggers instant debounced cloud sync
+ * so changes made on this device are automatically mirrored to other devices in real time.
+ */
+export function notifyDataChanged(changeType, entityId = null, payload = null) {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('ifspl:data_changed', { 
+        detail: { changeType, entityId, payload, timestamp: Date.now() } 
+      }));
+
+      // Domain-specific events for seamless in-memory re-renders
+      if (changeType.includes('site')) {
+        window.dispatchEvent(new CustomEvent('ifspl:sites_updated', { detail: { changeType, entityId } }));
+      }
+      if (changeType.includes('position') || changeType.includes('asset') || changeType.includes('equipment')) {
+        window.dispatchEvent(new CustomEvent('ifspl:positions_updated', { detail: { changeType, entityId } }));
+      }
+      if (changeType.includes('visit') || changeType.includes('checklist') || changeType.includes('inspection')) {
+        window.dispatchEvent(new CustomEvent('ifspl:visits_updated', { detail: { changeType, entityId } }));
+      }
+      if (changeType.includes('qr')) {
+        window.dispatchEvent(new CustomEvent('ifspl:qr_registry_updated', { detail: { changeType, entityId } }));
+      }
+
+      // Request immediate debounced push to Supabase Cloud
+      window.dispatchEvent(new CustomEvent('ifspl:request_cloud_sync', {
+        detail: { reason: changeType, entityId }
+      }));
+    } catch (e) {
+      console.warn('notifyDataChanged notice:', e);
+    }
+  }
+}
+
+/**
  * Clear all demo/sample client data for production launch
  * Strictly preserves all 26 Checklists, SOPs, Equipment Masters, Template Mappings, and Technicians
  */
@@ -61,6 +97,7 @@ export function clearAllClientData() {
       window.dispatchEvent(new CustomEvent('ifspl:data_cleared'));
     } catch (e) {}
   }
+  notifyDataChanged('all_client_data_cleared');
 }
 
 /**
@@ -77,6 +114,7 @@ export function seedDemoClientData() {
       window.dispatchEvent(new CustomEvent('ifspl:data_cleared'));
     } catch (e) {}
   }
+  notifyDataChanged('demo_data_seeded');
 }
 
 // Initialize default storage
@@ -345,6 +383,7 @@ export function addSite(siteData) {
   };
   sites.push(newSite);
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites));
+  notifyDataChanged('site_added', newSite.id, newSite);
   return newSite;
 }
 
@@ -370,6 +409,7 @@ export function updateSite(siteId, updatedData) {
     amcExpiryDate: updatedData.amcExpiryDate !== undefined ? updatedData.amcExpiryDate : sites[index].amcExpiryDate
   };
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites));
+  notifyDataChanged('site_updated', siteId, sites[index]);
   return sites[index];
 }
 
@@ -378,6 +418,7 @@ export function deleteSite(siteId) {
   const sites = data ? JSON.parse(data) : [];
   const filtered = sites.filter(s => s.id !== siteId);
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(filtered));
+  notifyDataChanged('site_deleted', siteId);
   return true;
 }
 
@@ -405,6 +446,7 @@ export function getPositionById(positionId) {
 export function savePositions(positions) {
   try {
     localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions || []));
+    notifyDataChanged('positions_saved');
     return true;
   } catch (e) {
     console.error('savePositions error:', e);
@@ -415,6 +457,7 @@ export function savePositions(positions) {
 export function saveSites(sites) {
   try {
     localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites || []));
+    notifyDataChanged('sites_saved');
     return true;
   } catch (e) {
     console.error('saveSites error:', e);
@@ -425,6 +468,7 @@ export function saveSites(sites) {
 export function saveVisits(visits) {
   try {
     localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits || []));
+    notifyDataChanged('visits_saved');
     return true;
   } catch (e) {
     console.error('saveVisits error:', e);
@@ -795,6 +839,7 @@ export function generateBulkQRCodes(quantity, options = {}) {
   // Atomically update sequence and registry
   localStorage.setItem(STORAGE_KEYS.QR_SEQUENCE, String(endSeq));
   localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+  notifyDataChanged('qr_generated', batchId, { startSeq, endSeq, count: newRecords.length });
 
   // Dispatch live notification event
   if (typeof window !== 'undefined') {
@@ -858,6 +903,7 @@ export function assignQRToAsset(qrToken, assetPositionId, assetName, options = {
     };
     registry.push(newRec);
     localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+    notifyDataChanged('qr_assigned', assetPositionId, newRec);
     return { success: true, record: newRec };
   }
 
@@ -881,6 +927,7 @@ export function assignQRToAsset(qrToken, assetPositionId, assetName, options = {
 
   registry[recIndex] = record;
   localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(registry));
+  notifyDataChanged('qr_assigned', assetPositionId, record);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('ifspl:qr_registry_updated', { 
@@ -1101,6 +1148,7 @@ export function replaceEquipmentAtPosition(positionId, replacementData) {
 
   positions[index] = updatedPosition;
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
+  notifyDataChanged('equipment_replaced', currentPos.positionId, updatedPosition);
 
   // Queue audit log
   queueSyncAction({
@@ -1213,6 +1261,7 @@ export function getActiveVisit(siteId = "SITE-AIL-001") {
   visits.unshift(visit);
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
   localStorage.setItem(STORAGE_KEYS.ACTIVE_VISIT_ID, visit.visitId);
+  notifyDataChanged('site_inspection_started', visit.visitId, visit);
 
   return visit;
 }
@@ -1354,6 +1403,7 @@ export function savePendingAssetJustifications(visitId, justifications = {}) {
   });
 
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  notifyDataChanged('pending_justification_saved', visitId);
   return { success: true, pendingJustifications: visits[vIndex].pendingJustifications };
 }
 
@@ -1463,6 +1513,7 @@ export function completeSiteInspection(visitId, {
 
   // Update site status
   updateSiteProgress(visit.siteId);
+  notifyDataChanged('site_inspection_completed', visitId, visit);
 
   queueSyncAction({
     type: 'SITE_INSPECTION_COMPLETED',
@@ -1571,6 +1622,7 @@ export function saveChecklistResult(visitId, positionId, checklistData) {
   updateSiteProgress(visits[vIndex].siteId);
 
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  notifyDataChanged('checklist_result_saved', positionId, { visitId, positionId });
 
   queueSyncAction({
     type: 'CHECKLIST_RECORDED',
@@ -1624,6 +1676,7 @@ export function saveVisitRemarks(visitId, { visitRemarks, sparesReplaced, pendin
   };
 
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  notifyDataChanged('visit_remarks_saved', visitId);
 
   queueSyncAction({
     type: 'VISIT_REMARKS_SAVED',
@@ -1676,6 +1729,7 @@ export function saveVisitSignatures(visitId, {
   };
 
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  notifyDataChanged('visit_signatures_saved', visitId);
 
   queueSyncAction({
     type: 'VISIT_SIGNED',
@@ -1711,6 +1765,7 @@ export function saveTemplateMapping(mapping) {
     });
   }
   localStorage.setItem(STORAGE_KEYS.TEMPLATE_MAPPINGS, JSON.stringify(mappings));
+  notifyDataChanged('template_mapping_saved', mapping.id);
   queueSyncAction({ type: 'TEMPLATE_MAPPING_UPDATED', mappingId: mapping.id, timestamp: new Date().toISOString() });
   return { success: true, mappings };
 }
@@ -1729,6 +1784,7 @@ export function getEquipmentMaster() {
 
 export function saveEquipmentMaster(items) {
   localStorage.setItem(STORAGE_KEYS.EQUIPMENT_MASTER, JSON.stringify(items));
+  notifyDataChanged('equipment_master_saved');
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('ifspl:equipment_master_changed', { detail: items }));
   }
@@ -1954,6 +2010,7 @@ export function registerNewAsset(assetData) {
 
   positions.unshift(newPosition);
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
+  notifyDataChanged('asset_registered', permanentPositionCode, newPosition);
 
   // Permanently bind this QR token in the permanent QR Registry!
   assignQRToAsset(qrToken, permanentPositionCode, assetData.equipmentName || assetData.equipmentType, {
@@ -2012,6 +2069,7 @@ export function updateAssetDetails(positionId, updatedData) {
 
   positions[index] = updatedPosition;
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(positions));
+  notifyDataChanged('asset_updated', preservedPositionId, updatedPosition);
 
   queueSyncAction({
     type: 'ASSET_UPDATED',
@@ -2234,6 +2292,7 @@ export function completeChecklistSession(visitId, templateId) {
   session.completedAt = new Date().toISOString();
 
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
+  notifyDataChanged('checklist_session_completed', visitId);
   return { success: true, session };
 }
 
