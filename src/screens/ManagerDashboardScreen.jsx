@@ -1158,25 +1158,25 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
-          {/* Client AMC Intelligence Reports Button */}
+          {/* Client AMC Intelligence Reports Button (Lightweight & Compact) */}
           <button
             className="hdr-btn"
             onClick={() => onNavigate('client-360-reports')}
             style={{
-              height:'30px', padding:'0 12px', borderRadius:'7px',
+              height:'30px', padding:'0 11px', borderRadius:'7px',
               display:'inline-flex', alignItems:'center', gap:'6px',
-              backgroundColor:'#0F172A', border:'1px solid #0F172A',
-              color:'#FFFFFF', fontSize:'12px', fontWeight:600,
+              backgroundColor:'#FFFFFF', border:'1px solid #E2E8F0',
+              color:'#0F172A', fontSize:'12px', fontWeight:600,
               cursor:'pointer',
-              boxShadow:'0 1px 3px rgba(15,23,42,0.2)',
+              boxShadow:'0 1px 2px rgba(0,0,0,0.03)',
               transition:'all 0.15s ease'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E293B'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0F172A'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; e.currentTarget.style.borderColor = '#BFDBFE'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
           >
-            <ShieldCheck size={13} color="#60A5FA" />
+            <ShieldCheck size={13} color="#2563EB" />
             <span>Client AMC Reports</span>
-            <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#2563EB', color: '#FFF' }}>360°</span>
+            <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE' }}>360°</span>
           </button>
 
           {/* Supabase Backup */}
@@ -1335,44 +1335,46 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         />
       </div>
 
-      {/* ═══ CLIENT AMC INTELLIGENCE 360° QUICK ACCESS BANNER ═══ */}
+      {/* ═══ CLIENT AMC INTELLIGENCE 360° QUICK ACCESS BANNER (Lightweight & Compact Light Theme) ═══ */}
       <div className="dash-row" style={{
-        backgroundColor: '#0F172A',
-        borderRadius: '12px',
-        padding: '16px 20px',
-        color: '#FFFFFF',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        borderLeft: '4px solid #2563EB',
+        borderRadius: '10px',
+        padding: '10px 14px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '14px',
-        boxShadow: '0 4px 14px rgba(15,23,42,0.12)'
+        gap: '10px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
           <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            backgroundColor: '#1E293B',
-            border: '1px solid #334155',
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            backgroundColor: '#EFF6FF',
+            border: '1px solid #DBEAFE',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#60A5FA'
+            color: '#2563EB',
+            flexShrink: 0
           }}>
-            <ShieldCheck size={22} />
+            <ShieldCheck size={18} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '-0.01em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
                 Client 360° AMC Intelligence & Executive Dossiers
               </span>
-              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', backgroundColor: '#2563EB', color: '#FFF' }}>
+              <span style={{ fontSize: '9px', fontWeight: 700, padding: '1.5px 5px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
                 MANAGEMENT BLUEPRINT
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>
-              Live contract health scores, asset registers, punch defect aging, technician audit histories, and exportable multi-sheet Excel workbooks.
+            <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '1px', lineHeight: 1.35 }}>
+              Live contract health scores, asset registers, punch defect aging, and exportable multi-sheet Excel workbooks.
             </div>
           </div>
         </div>
@@ -1380,26 +1382,27 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         <button
           onClick={() => onNavigate('client-360-reports')}
           style={{
-            height: '34px',
-            padding: '0 16px',
-            borderRadius: '8px',
+            height: '28px',
+            padding: '0 12px',
+            borderRadius: '6px',
             backgroundColor: '#2563EB',
             border: 'none',
             color: '#FFFFFF',
-            fontSize: '12.5px',
+            fontSize: '11.5px',
             fontWeight: 600,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
-            boxShadow: '0 2px 4px rgba(37,99,235,0.3)',
-            transition: 'all 0.15s ease'
+            gap: '5px',
+            boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
+            transition: 'all 0.15s ease',
+            flexShrink: 0
           }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1D4ED8'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563EB'; }}
         >
           <span>Open Client AMC Reports</span>
-          <ArrowRight size={14} />
+          <ArrowRight size={13} />
         </button>
       </div>
 
