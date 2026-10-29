@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, getPositions, addSite, updateSite, deleteSite, clearAllClientData, seedDemoClientData } from '../data/storage';
-import { deleteSiteFromSupabase, clearSupabaseClientData } from '../services/supabaseBackup.js';
+import { deleteSiteFromSupabase, clearSupabaseClientData, saveSiteToSupabase, fetchSitesFromSupabase } from '../services/supabaseBackup.js';
 import TemplateMappingsModal from '../components/TemplateMappingsModal';
 import EquipmentMasterModal from '../components/EquipmentMasterModal';
 import { 
@@ -52,6 +52,11 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
 
   // Sync state on storage & background cloud sync events
   useEffect(() => {
+    // Eagerly pull latest client master records from Supabase
+    fetchSitesFromSupabase().then(freshSites => {
+      if (Array.isArray(freshSites)) setSites(freshSites);
+    }).catch(() => {});
+
     const handleUpdate = () => {
       setSites(getSites());
       setPositions(getPositions());
@@ -222,7 +227,10 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   const handleSaveEdit = (e) => {
     e.preventDefault();
     if (!activeClient) return;
-    updateSite(activeClient.id, formData);
+    const updated = updateSite(activeClient.id, formData);
+    if (updated) {
+      saveSiteToSupabase(updated).catch(err => console.warn('Cloud update site notice:', err));
+    }
     reloadSites();
     setIsEditModalOpen(false);
     setActiveClient(null);
@@ -254,7 +262,10 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   const handleSaveAdd = (e) => {
     e.preventDefault();
     if (!formData.clientName.trim()) return;
-    addSite(formData);
+    const newSite = addSite(formData);
+    if (newSite) {
+      saveSiteToSupabase(newSite).catch(err => console.warn('Cloud save site notice:', err));
+    }
     reloadSites();
     setIsAddModalOpen(false);
   };

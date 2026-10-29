@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getSites, registerNewAsset, getEquipmentMaster } from '../data/storage';
 import { EQUIPMENT_CATEGORIES, resolveChecklistMapping, getLinkedCapacities } from '../data/templateMappings';
 import { CHECKLIST_TEMPLATES } from '../data/checklistTemplates';
+import { fetchSitesFromSupabase, savePositionToSupabase } from '../services/supabaseBackup';
 import PhotoCapture from '../components/PhotoCapture';
 import QRStickerCard from '../components/QRStickerCard';
 import EquipmentMasterModal from '../components/EquipmentMasterModal';
@@ -23,32 +24,34 @@ import {
   Lock,
   Check,
   ChevronRight,
-  Link as LinkIcon
+  Link as LinkIcon,
+  RefreshCw
 } from 'lucide-react';
 
 export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, prefilledQR }) {
-  const sites = getSites();
+  const [sites, setSites] = useState(() => getSites());
+  const [isLoadingSites, setIsLoadingSites] = useState(false);
 
   // Wizard Step State (1: Client & Site, 2: Equipment, 3: Checklist Mapping, 4: Review, 5: Sticker)
   const [step, setStep] = useState(1);
 
   // Form State
   const initialSite = sites[0] || {};
-  const [siteId, setSiteId] = useState(initialSite.id || 'SITE-AIL-001');
-  const [clientName, setClientName] = useState(initialSite.clientName || initialSite.company || initialSite.name || 'Campus Store Co.');
-  const [siteName, setSiteName] = useState(initialSite.plantFacility || initialSite.name || 'Aarti Industries Ltd — Unit IV');
-  const [siteAddress, setSiteAddress] = useState(initialSite.address || 'Plot 2201/2202, Jhagadia GIDC Industrial Estate, Bharuch, Gujarat 393110');
-  const [city, setCity] = useState(initialSite.city || 'Jhagadia / Bharuch');
-  const [poNumber, setPoNumber] = useState(initialSite.poNumber || 'PO/AIL/AMC/2026/8812');
-  const [poDate, setPoDate] = useState(initialSite.poDate || '2026-04-01');
+  const [siteId, setSiteId] = useState(initialSite.id || '');
+  const [clientName, setClientName] = useState(initialSite.clientName || initialSite.company || initialSite.name || '');
+  const [siteName, setSiteName] = useState(initialSite.plantFacility || initialSite.name || '');
+  const [siteAddress, setSiteAddress] = useState(initialSite.address || '');
+  const [city, setCity] = useState(initialSite.city || '');
+  const [poNumber, setPoNumber] = useState(initialSite.poNumber || '');
+  const [poDate, setPoDate] = useState(initialSite.poDate || '');
   const [amcType, setAmcType] = useState(initialSite.amcType || initialSite.frequency || 'Quarterly');
   const [noOfVisits, setNoOfVisits] = useState(initialSite.noOfVisits !== undefined ? initialSite.noOfVisits : 4);
-  const [amcExpiryDate, setAmcExpiryDate] = useState(initialSite.amcExpiryDate || '2027-03-31');
-  const [taxId, setTaxId] = useState(initialSite.taxId || '24AAACA1234F1Z5');
-  const [contactPhone, setContactPhone] = useState(initialSite.contactPhone || '+91 98201 55667');
-  const [email, setEmail] = useState(initialSite.email || 'aditi@campusstore.demo');
-  const [area, setArea] = useState('Plant 1 — Reaction Bay (Ground Floor)');
-  const [location, setLocation] = useState('Near Column C-4, West Fire Corridor');
+  const [amcExpiryDate, setAmcExpiryDate] = useState(initialSite.amcExpiryDate || '');
+  const [taxId, setTaxId] = useState(initialSite.taxId || '');
+  const [contactPhone, setContactPhone] = useState(initialSite.contactPhone || '');
+  const [email, setEmail] = useState(initialSite.email || '');
+  const [area, setArea] = useState('Ground Floor / Plant Floor');
+  const [location, setLocation] = useState('Near Main Emergency Exit');
 
   // Master List & Equipment Fields
   const [equipmentMaster, setEquipmentMaster] = useState(getEquipmentMaster());
@@ -82,22 +85,40 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
   const [registrationResult, setRegistrationResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Synchronize equipment master changes
-  useEffect(() => {
-    const handleMasterChanged = (e) => {
-      setEquipmentMaster(e.detail || getEquipmentMaster());
-    };
-    window.addEventListener('ifspl:equipment_master_changed', handleMasterChanged);
-    return () => window.removeEventListener('ifspl:equipment_master_changed', handleMasterChanged);
-  }, []);
+  // 1. Unique Clients List derived from authoritative database records
+  const uniqueClients = useMemo(() => {
+    const map = new Map();
+    sites.forEach(s => {
+      const cName = (s.clientName || s.company || s.name || '').trim();
+      if (cName && !map.has(cName)) {
+        map.set(cName, {
+          clientName: cName,
+          clientCode: s.code || s.id,
+          firstSiteId: s.id,
+          sites: []
+        });
+      }
+      if (cName) {
+        map.get(cName).sites.push(s);
+      }
+    });
+    return Array.from(map.values());
+  }, [sites]);
 
-  // Handle site/client selection — auto-fetch all client-related details
-  const handleSiteChange = (selectedId) => {
+  // 2. Sites / Plant Facilities belonging to the selected client
+  const clientSites = useMemo(() => {
+    if (!clientName) return sites;
+    const matches = sites.filter(s => (s.clientName || s.company || s.name || '').trim().toLowerCase() === clientName.trim().toLowerCase());
+    return matches.length > 0 ? matches : sites;
+  }, [clientName, sites]);
+
+  // Handle site selection — auto-fetch all client and plant parameters
+  const handleSiteChange = (selectedId, currentSitesList = sites) => {
     setSiteId(selectedId);
-    const found = sites.find(s => s.id === selectedId);
+    const found = currentSitesList.find(s => s.id === selectedId);
     if (found) {
       setClientName(found.clientName || found.company || found.name || '');
-      setSiteName(found.plantFacility || found.name || '');
+      setSiteName(found.plantFacility || found.name || 'Plant Facility 1');
       setSiteAddress(found.address || '');
       setCity(found.city || '');
       setPoNumber(found.poNumber || '');
@@ -110,6 +131,87 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
       setEmail(found.email || '');
     }
   };
+
+  // Handle client selection — filter plant facilities and populate first site
+  const handleClientChange = (selectedCName, currentSitesList = sites) => {
+    setClientName(selectedCName);
+    const matches = currentSitesList.filter(s => (s.clientName || s.company || s.name || '').trim().toLowerCase() === selectedCName.trim().toLowerCase());
+    if (matches.length > 0) {
+      handleSiteChange(matches[0].id, currentSitesList);
+    }
+  };
+
+  // Eagerly pull registered clients from Supabase database on mount & listen to cross-device sync
+  const refreshSitesFromCloud = async () => {
+    setIsLoadingSites(true);
+    try {
+      const remoteSites = await fetchSitesFromSupabase();
+      if (Array.isArray(remoteSites) && remoteSites.length > 0) {
+        setSites(remoteSites);
+        const match = remoteSites.find(s => s.id === siteId);
+        if (!match) {
+          handleSiteChange(remoteSites[0].id, remoteSites);
+        }
+      }
+    } catch (e) {
+      console.warn('refreshSitesFromCloud error:', e);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingSites(true);
+
+    fetchSitesFromSupabase().then(remoteSites => {
+      if (isMounted && Array.isArray(remoteSites) && remoteSites.length > 0) {
+        setSites(remoteSites);
+        setIsLoadingSites(false);
+        const currentFound = remoteSites.find(s => s.id === siteId);
+        if (!currentFound) {
+          handleSiteChange(remoteSites[0].id, remoteSites);
+        }
+      } else if (isMounted) {
+        setIsLoadingSites(false);
+      }
+    }).catch(() => {
+      if (isMounted) setIsLoadingSites(false);
+    });
+
+    const handleSitesUpdated = () => {
+      const updated = getSites();
+      if (Array.isArray(updated) && updated.length > 0) {
+        setSites(updated);
+        const match = updated.find(s => s.id === siteId);
+        if (!match) {
+          handleSiteChange(updated[0].id, updated);
+        }
+      }
+    };
+
+    window.addEventListener('ifspl:sites_updated', handleSitesUpdated);
+    window.addEventListener('ifspl:cloud_synced', handleSitesUpdated);
+    window.addEventListener('ifspl:data_changed', handleSitesUpdated);
+    window.addEventListener('storage', handleSitesUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('ifspl:sites_updated', handleSitesUpdated);
+      window.removeEventListener('ifspl:cloud_synced', handleSitesUpdated);
+      window.removeEventListener('ifspl:data_changed', handleSitesUpdated);
+      window.removeEventListener('storage', handleSitesUpdated);
+    };
+  }, []);
+
+  // Synchronize equipment master changes
+  useEffect(() => {
+    const handleMasterChanged = (e) => {
+      setEquipmentMaster(e.detail || getEquipmentMaster());
+    };
+    window.addEventListener('ifspl:equipment_master_changed', handleMasterChanged);
+    return () => window.removeEventListener('ifspl:equipment_master_changed', handleMasterChanged);
+  }, []);
 
   // Re-evaluate mapping whenever category, service type, or equipment type changes
   useEffect(() => {
@@ -171,8 +273,8 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
 
   // Step 1 Validation (Client is auto-fetched, Area and Exact Location are required)
   const validateStep1 = () => {
-    if (!siteId) {
-      setErrorMessage('Please select a Client / Company Name.');
+    if (!siteId || !clientName) {
+      setErrorMessage('Please select a Client / Company Name and Site Facility.');
       return false;
     }
     if (!area.trim() || !location.trim()) {
@@ -253,6 +355,10 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
     }
 
     setRegistrationResult(result.position);
+    
+    // Immediately persist directly to Supabase Cloud for cross-device visibility
+    savePositionToSupabase(result.position).catch(err => console.warn('Cloud position save notice:', err));
+
     if (onAssetRegistered) {
       onAssetRegistered(result.position);
     }
@@ -484,30 +590,111 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
             </span>
           </div>
 
-          {/* 1. Client Selection Dropdown */}
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#17191C', marginBottom: '6px' }}>
-              Select Client / Company Name: <span style={{ color: '#E00000' }}>*</span>
-            </label>
-            <select
-              className="input-field"
-              value={siteId}
-              onChange={(e) => handleSiteChange(e.target.value)}
-              style={{ fontWeight: 500, fontSize: '14px', height: '40px', borderColor: '#E1E5E9' }}
-            >
-              {sites.map(s => {
-                const cName = s.clientName || s.company || s.name;
-                const pFacility = s.plantFacility || s.name;
-                return (
-                  <option key={s.id} value={s.id}>
-                    {cName} — {pFacility} ({s.city})
-                  </option>
-                );
-              })}
-            </select>
-            <span style={{ fontSize: '12px', color: '#788494', marginTop: '4px', display: 'block' }}>
-              Picking a client automatically populates all client master and AMC contract data below.
-            </span>
+          {/* 1. Client & Site Selection Connected Dropdowns */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* 1A. Client Name Dropdown */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: '#17191C' }}>
+                  Select Client / Customer Organization: <span style={{ color: '#E00000' }}>*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={refreshSitesFromCloud}
+                  disabled={isLoadingSites}
+                  style={{
+                    border: '1px solid #BFDBFE',
+                    background: '#EFF6FF',
+                    color: '#1D4ED8',
+                    padding: '2px 8px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: isLoadingSites ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Check and pull latest registered clients from Supabase database"
+                >
+                  <RefreshCw size={11} className={isLoadingSites ? 'animate-spin' : ''} />
+                  <span>{isLoadingSites ? 'Syncing...' : 'Sync Cloud'}</span>
+                </button>
+              </div>
+
+              {uniqueClients.length === 0 ? (
+                <div style={{
+                  padding: '12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  fontSize: '12.5px',
+                  color: '#991B1B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>{isLoadingSites ? 'Loading registered clients from Supabase cloud...' : 'No clients found in database yet.'}</span>
+                  <button
+                    type="button"
+                    onClick={refreshSitesFromCloud}
+                    style={{
+                      background: '#DC2626',
+                      color: '#FFF',
+                      border: 'none',
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ↻ Retry Sync
+                  </button>
+                </div>
+              ) : (
+                <select
+                  className="input-field"
+                  value={clientName}
+                  onChange={(e) => handleClientChange(e.target.value)}
+                  style={{ fontWeight: 600, fontSize: '14px', height: '40px', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }}
+                >
+                  <option value="" disabled>-- Select Registered Client --</option>
+                  {uniqueClients.map(c => (
+                    <option key={c.clientName} value={c.clientName}>
+                      {c.clientName} {c.clientCode ? `(${c.clientCode})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* 1B. Plant / Site Facility Dropdown */}
+            {uniqueClients.length > 0 && (
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#17191C', marginBottom: '6px' }}>
+                  Select Site / Plant Facility: <span style={{ color: '#E00000' }}>*</span>
+                </label>
+                <select
+                  className="input-field"
+                  value={siteId}
+                  onChange={(e) => handleSiteChange(e.target.value)}
+                  style={{ fontWeight: 500, fontSize: '14px', height: '40px', borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' }}
+                >
+                  {clientSites.map(s => {
+                    const pFacility = s.plantFacility || s.name || 'Plant Facility';
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {pFacility} — {s.city || 'Gujarat'} ({s.code || s.id})
+                      </option>
+                    );
+                  })}
+                </select>
+                <span style={{ fontSize: '11.5px', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                  Linked relationship: Asset → Client Master ({clientName}) → Facility ({siteName})
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 2. Auto-Fetched Client & Contract Dossier (Strictly Non-Editable) */}

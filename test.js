@@ -55,6 +55,9 @@ async function runAllTests() {
   console.log('\n\n');
   const client360Tests = await import('./src/utils/test_client_360_intelligence.js');
   await client360Tests.runClient360IntelligenceTests();
+  console.log('\n\n');
+  const crossDeviceTests = await import('./src/utils/test_cross_device_client_sync.js');
+  await crossDeviceTests.runCrossDeviceClientSyncTests();
 }
 
 runAllTests();

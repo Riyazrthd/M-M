@@ -784,6 +784,224 @@ export async function clearSupabaseClientData() {
   }
 }
 
+// ----------------------------------------------------------------------------
+// TARGETED REAL-TIME MUTATION APIS FOR INSTANT CROSS-DEVICE PERSISTENCE
+// ----------------------------------------------------------------------------
+
+/**
+ * Saves or updates an individual client/site master record directly to Supabase.
+ * Ensures immediate cross-device availability without waiting for debounced queue.
+ */
+export async function saveSiteToSupabase(siteData) {
+  if (!siteData || !siteData.id) return { success: false, error: 'Site data and ID required' };
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey) return { success: false, error: 'No cloud config' };
+
+  const cleanUrl = cfg.url.trim().replace(/\/+$/, '');
+  const cleanKey = cfg.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'resolution=merge-duplicates,return=representation'
+  };
+
+  const payload = [{
+    id: siteData.id,
+    client_name: (siteData.clientName || siteData.name || siteData.company || 'New Client Co.').trim(),
+    name: siteData.name || siteData.clientName || 'New Client Co.',
+    company: siteData.company || siteData.clientName || 'New Client Co.',
+    plant_facility: siteData.plantFacility || siteData.name || 'Plant Facility 1',
+    code: siteData.code || siteData.id,
+    address: siteData.address || '',
+    city: siteData.city || 'Vadodara',
+    po_number: siteData.poNumber || null,
+    po_date: siteData.poDate || null,
+    amc_type: siteData.amcType || siteData.frequency || 'Quarterly',
+    frequency: siteData.frequency || siteData.amcType || 'Quarterly',
+    no_of_visits: siteData.noOfVisits !== undefined ? Number(siteData.noOfVisits) : 4,
+    amc_expiry_date: siteData.amcExpiryDate || null,
+    work_order_ref: siteData.workOrderRef || null,
+    contract_period: siteData.contractPeriod || null,
+    client_contact: siteData.clientContact || 'Primary Contact',
+    contact_phone: siteData.contactPhone || null,
+    email: siteData.email || null,
+    tax_id: siteData.taxId || null,
+    total_positions: siteData.totalPositions || 0,
+    inspected_positions: siteData.inspectedPositions || 0,
+    status: siteData.status || 'Scheduled',
+    scheduled_date: siteData.scheduledDate || null,
+    applicable_checklists: siteData.applicableChecklists || ['CL-11', 'CL-03'],
+    updated_at: new Date().toISOString()
+  }];
+
+  try {
+    const res = await fetch(`${cleanUrl}/rest/v1/sites`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      removeDeletedSiteId(siteData.id);
+      saveSupabaseConfig({ lastSyncedAt: new Date().toISOString() });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ifspl:sites_updated', { detail: { site: siteData } }));
+      }
+      return { success: true };
+    } else {
+      const err = await res.text();
+      console.warn('saveSiteToSupabase notice:', err);
+      return { success: false, error: err };
+    }
+  } catch (err) {
+    console.warn('saveSiteToSupabase error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetches all registered clients/sites directly from Supabase Cloud.
+ * Caches them into local storage and triggers real-time UI re-render.
+ */
+export async function fetchSitesFromSupabase() {
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey) return getSites();
+
+  const cleanUrl = cfg.url.trim().replace(/\/+$/, '');
+  const cleanKey = cfg.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    const res = await fetch(`${cleanUrl}/rest/v1/sites?select=*&order=created_at.desc`, { headers });
+    if (!res.ok) {
+      console.warn('fetchSitesFromSupabase response status:', res.status);
+      return getSites();
+    }
+    const remoteSites = await res.json();
+    if (Array.isArray(remoteSites)) {
+      const deletedSiteIds = getDeletedSiteIds();
+      const activeRemote = remoteSites.filter(s => s && s.id && !deletedSiteIds.includes(s.id));
+
+      const transformed = activeRemote.map(s => ({
+        id: s.id,
+        clientName: s.client_name || s.name || s.company,
+        name: s.name || s.client_name,
+        company: s.company || s.client_name,
+        plantFacility: s.plant_facility || s.name || 'Plant Facility 1',
+        code: s.code || s.id,
+        address: s.address || '',
+        city: s.city || '',
+        poNumber: s.po_number || '',
+        poDate: s.po_date || '',
+        amcType: s.amc_type || 'Quarterly',
+        frequency: s.frequency || s.amc_type || 'Quarterly',
+        noOfVisits: s.no_of_visits !== undefined ? s.no_of_visits : 4,
+        amcExpiryDate: s.amc_expiry_date || '',
+        workOrderRef: s.work_order_ref || '',
+        contractPeriod: s.contract_period || '',
+        clientContact: s.client_contact || 'Primary Contact',
+        contactPhone: s.contact_phone || '',
+        email: s.email || '',
+        taxId: s.tax_id || '',
+        totalPositions: s.total_positions || 0,
+        inspectedPositions: s.inspected_positions || 0,
+        status: s.status || 'Scheduled',
+        scheduledDate: s.scheduled_date || '',
+        applicableChecklists: s.applicable_checklists || ['CL-11', 'CL-03']
+      }));
+
+      // Cache locally into storage
+      try {
+        localStorage.setItem('ifspl_amc_sites', JSON.stringify(transformed));
+        localStorage.setItem('ifspl_production_clean_v1', 'true');
+      } catch (e) {}
+
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('ifspl:sites_updated', { detail: { sites: transformed } }));
+        } catch (e) {}
+      }
+      return transformed;
+    }
+  } catch (err) {
+    console.warn('fetchSitesFromSupabase error:', err);
+  }
+  return getSites();
+}
+
+/**
+ * Saves a newly registered asset position directly to Supabase Cloud.
+ * Ensures the asset is immediately committed to cloud and available cross-device.
+ */
+export async function savePositionToSupabase(positionData) {
+  if (!positionData || !positionData.positionId) return { success: false, error: 'Position data required' };
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey) return { success: false, error: 'No cloud config' };
+
+  const cleanUrl = cfg.url.trim().replace(/\/+$/, '');
+  const cleanKey = cfg.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'resolution=merge-duplicates,return=representation'
+  };
+
+  const payload = [{
+    id: positionData.id || `pos-${Date.now()}`,
+    position_id: positionData.positionId,
+    qr_code: positionData.qrCode || positionData.qrToken,
+    site_id: positionData.siteId,
+    area: positionData.area || '',
+    location: positionData.location || '',
+    equipment_category: positionData.equipmentCategory || '',
+    equipment_type: positionData.equipmentType || '',
+    capacity: positionData.capacity || positionData.currentEquipment?.capacity || '',
+    service_type: positionData.serviceType || '',
+    template_id: positionData.templateId || 'CL-11',
+    current_equipment_id: positionData.currentEquipmentId || positionData.currentEquipment?.serialNo || null,
+    current_equipment: positionData.currentEquipment || null,
+    applicable_checklist_mapping: positionData.applicableChecklistMapping || null,
+    inspection_status: positionData.inspectionStatus || 'Pending Initial Inspection',
+    last_inspection_date: positionData.lastInspectionDate || null,
+    last_inspection_time: positionData.lastInspectionTime || null,
+    technician_name: positionData.technicianName || null,
+    technician_badge: positionData.technicianBadge || null,
+    history: positionData.history || [],
+    inspection_history: positionData.inspectionHistory || [],
+    notes: positionData.notes || '',
+    status: positionData.status || 'Active',
+    updated_at: new Date().toISOString()
+  }];
+
+  try {
+    const res = await fetch(`${cleanUrl}/rest/v1/positions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      saveSupabaseConfig({ lastSyncedAt: new Date().toISOString() });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ifspl:positions_updated', { detail: { position: positionData } }));
+      }
+      return { success: true };
+    } else {
+      const err = await res.text();
+      console.warn('savePositionToSupabase notice:', err);
+      return { success: false, error: err };
+    }
+  } catch (err) {
+    console.warn('savePositionToSupabase error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // Live Push to Supabase Cloud via PostgREST
 export async function pushDataToSupabase(url, anonKey) {
   const conn = await testSupabaseConnection(url, anonKey);
@@ -1545,10 +1763,11 @@ export function initBackgroundCloudSync(options = {}) {
     clearSupabaseClientData();
   });
 
-  // Initial silent check on application launch
+  // Initial silent check & eager site hydration on application launch
   setTimeout(() => {
+    fetchSitesFromSupabase().catch(() => {});
     silentCheckAndSync('initial_launch');
-  }, 1200);
+  }, 50);
 }
 
 
