@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { COMPANY_INFO } from '../data/checklistTemplates.js';
 
 /**
@@ -92,6 +91,8 @@ export async function downloadPendingAssetsExcel({ site, visit, pendingAssets = 
   const visitId = visit?.visitId || visit?.id || 'VISIT';
   const techName = visit?.technician || visit?.technicianName || visit?.serviceEngineer || 'Ramesh Patel';
 
+  const ExcelJSModule = await import('exceljs');
+  const ExcelJS = ExcelJSModule.default || ExcelJSModule;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Indus Fire Safety Private Limited';
   workbook.created = new Date();

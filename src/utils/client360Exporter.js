@@ -1,7 +1,6 @@
 // Indus Fire Safety Private Limited — Client 360° AMC Intelligence Exporter
 // Provides professional Excel Workbook (.xlsx with 10 sheets) and comprehensive Vector Printable PDF report
 
-import ExcelJS from 'exceljs';
 import { COMPANY_INFO } from '../data/checklistTemplates.js';
 
 /**
@@ -10,6 +9,8 @@ import { COMPANY_INFO } from '../data/checklistTemplates.js';
 export async function downloadClient360ExcelWorkbook(summary) {
   if (!summary) return { success: false, error: 'Summary data required' };
 
+  const ExcelJSModule = await import('exceljs');
+  const ExcelJS = ExcelJSModule.default || ExcelJSModule;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Indus Fire Safety Private Limited';
   workbook.created = new Date();

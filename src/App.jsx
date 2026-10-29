@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Flame, CheckCircle2, AlertCircle, Camera, ArrowRight, ShieldAlert } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -21,8 +21,9 @@ import VisitSummaryScreen from './screens/VisitSummaryScreen';
 import ManagerDashboardScreen from './screens/ManagerDashboardScreen';
 import ClientPortalScreen from './screens/ClientPortalScreen';
 import AssetRegisterScreen from './screens/AssetRegisterScreen';
-import QRManagementScreen from './screens/QRManagementScreen';
-import Client360ReportScreen from './screens/Client360ReportScreen';
+
+const QRManagementScreen = lazy(() => import('./screens/QRManagementScreen'));
+const Client360ReportScreen = lazy(() => import('./screens/Client360ReportScreen'));
 
 import { 
   initStorage, 
@@ -540,6 +541,12 @@ export default function App() {
 
         {/* Screen Content Area */}
         <main className="app-content-body">
+          <Suspense fallback={
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '40vh', gap: '12px', color: '#475569' }}>
+              <div style={{ width: '36px', height: '36px', border: '3px solid #E2E8F0', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'ifspl_spin 0.7s linear infinite' }}></div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>Loading Module...</div>
+            </div>
+          }>
           {currentScreen === 'site-list' && (
             <SiteListScreen
               onNavigate={navigateTo}
@@ -635,6 +642,7 @@ export default function App() {
               onNavigate={navigateTo}
             />
           )}
+          </Suspense>
         </main>
       </div>
 

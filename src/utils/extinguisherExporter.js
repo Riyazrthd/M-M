@@ -1,4 +1,3 @@
-import ExcelJS from 'exceljs';
 import { COMPANY_INFO } from '../data/checklistTemplates.js';
 
 /**
@@ -140,6 +139,8 @@ export function downloadClientExtinguishersCSV({ clientName, siteName, extinguis
  */
 export async function downloadClientAssetsExcel({ clientName, siteName, assets = [], reportTitle = 'ALL REGISTERED ASSET INVENTORY' }) {
   const safeClient = clientName || 'Client';
+  const ExcelJSModule = await import('exceljs');
+  const ExcelJS = ExcelJSModule.default || ExcelJSModule;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Indus Fire Safety Private Limited';
   workbook.created = new Date();

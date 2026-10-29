@@ -1,7 +1,6 @@
 // Indus Fire Safety Private Limited - Exact Control Copy Checklist Exporter
 // Produces 100% exact CSV and Excel (.xlsx) matching the master control workbook format
 
-import ExcelJS from 'exceljs';
 import { CHECKLIST_TEMPLATES, COMPANY_INFO } from '../data/checklistTemplates';
 
 /**
@@ -223,6 +222,8 @@ export async function downloadChecklistExcel(templateId, options = {}) {
   }
   const arrayBuffer = await response.arrayBuffer();
 
+  const ExcelJSModule = await import('exceljs');
+  const ExcelJS = ExcelJSModule.default || ExcelJSModule;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(arrayBuffer);
 
@@ -418,6 +419,8 @@ export async function downloadMasterWorkbookExcel(options = {}) {
   }
   const arrayBuffer = await response.arrayBuffer();
 
+  const ExcelJSModule = await import('exceljs');
+  const ExcelJS = ExcelJSModule.default || ExcelJSModule;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(arrayBuffer);
 

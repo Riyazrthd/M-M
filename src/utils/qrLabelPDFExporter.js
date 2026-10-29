@@ -2,7 +2,6 @@
 // Generates print-ready PDFs formatted for A4 label sheets with exact physical millimeter dimensions
 // Meets all Master Prompt requirements: exact 25 mm x 25 mm QR, centered SR. NO. below, cutting guides
 
-import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { buildQRScanUrl } from './qrUrlHelper.js';
 
@@ -26,6 +25,7 @@ export async function generateBulkQRLabelsPDF(qrRecords, options = {}) {
   }
 
   // A4 dimensions in mm: 210 x 297
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',

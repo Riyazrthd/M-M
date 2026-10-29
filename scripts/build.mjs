@@ -13,6 +13,25 @@ execSync('node node_modules/vite/bin/vite.js build', { stdio: 'inherit' });
 const distPath = path.resolve('dist');
 const docsPath = path.resolve('docs');
 const rootAssetsPath = path.resolve('assets');
+const distAssetsPath = path.join(distPath, 'assets');
+const docsAssetsPath = path.join(docsPath, 'assets');
+
+// Helper to copy directory contents without wiping out existing legacy chunks
+function copyDirPreserving(srcDir, destDir) {
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirPreserving(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 
 // 1. Ensure 404.html is in dist
 if (fs.existsSync('404.html')) {
@@ -30,12 +49,12 @@ if (fs.existsSync('404.html')) {
 fs.writeFileSync('.nojekyll', '');
 fs.writeFileSync(path.join(distPath, '.nojekyll'), '');
 
-// 3. Sync to docs/ directory BEFORE creating any subfolders in dist
+// 3. Sync to docs/ directory, preserving legacy asset chunks for backward compatibility
 console.log('[Build] Syncing to docs folder...');
-if (fs.existsSync(docsPath)) {
-  fs.rmSync(docsPath, { recursive: true, force: true });
+if (!fs.existsSync(docsPath)) {
+  fs.mkdirSync(docsPath, { recursive: true });
 }
-fs.cpSync(distPath, docsPath, { recursive: true });
+copyDirPreserving(distPath, docsPath);
 fs.writeFileSync(path.join(docsPath, '.nojekyll'), '');
 
 // 4. Create backward-compatible docs/ alias inside dist for legacy URLs
@@ -47,18 +66,17 @@ fs.copyFileSync(path.join(distPath, 'index.html'), path.join(distDocsPath, 'inde
 if (fs.existsSync('404.html')) {
   fs.copyFileSync('404.html', path.join(distDocsPath, '404.html'));
 }
-fs.cpSync(path.join(distPath, 'assets'), path.join(distDocsPath, 'assets'), { recursive: true });
+copyDirPreserving(distAssetsPath, path.join(distDocsPath, 'assets'));
 
-// 5. Sync production assets to root assets/
+// 5. Sync production assets to root assets/, preserving legacy asset chunks
 console.log('[Build] Syncing production assets to root assets folder...');
-if (fs.existsSync(rootAssetsPath)) {
-  fs.rmSync(rootAssetsPath, { recursive: true, force: true });
-}
-fs.cpSync(path.join(distPath, 'assets'), rootAssetsPath, { recursive: true });
+copyDirPreserving(distAssetsPath, rootAssetsPath);
 
-// 6. CRITICAL: Replace root index.html with the compiled production bundle
-// This guarantees that if GitHub Pages deploys from main branch root (/),
-// it serves the compiled JavaScript bundle and never gets stuck on loading!
+// 6. Also sync all root assets back to docs/assets and dist/assets so legacy chunks are in all distributions
+copyDirPreserving(rootAssetsPath, docsAssetsPath);
+copyDirPreserving(rootAssetsPath, distAssetsPath);
+
+// 7. CRITICAL: Replace root index.html with the compiled production bundle
 console.log('[Build] Writing compiled production bundle to root index.html...');
 fs.copyFileSync(path.join(distPath, 'index.html'), 'index.html');
 
