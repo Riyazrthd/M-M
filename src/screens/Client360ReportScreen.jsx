@@ -53,6 +53,12 @@ export default function Client360ReportScreen({
   // Selected visit modal
   const [selectedVisitModal, setSelectedVisitModal] = useState(null);
 
+  useEffect(() => {
+    if (initialClientId) {
+      setSelectedClientName(initialClientId);
+    }
+  }, [initialClientId]);
+
   // Reload data when mutations occur
   const reloadData = () => {
     setClientsList(getAllClients360List());

@@ -761,16 +761,43 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 {/* Spacer Column */}
                 <div />
 
-                {/* Actions Column (Eye, Pencil, Red Trash) */}
+                {/* Actions Column (360°, Eye, Pencil, Red Trash) */}
                 <div 
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'flex-end',
-                    gap: '12px'
+                    gap: '10px'
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate('client-360-reports', site.clientName || site.company || site.name);
+                    }}
+                    style={{
+                      height: '24px',
+                      padding: '0 8px',
+                      borderRadius: '5px',
+                      backgroundColor: '#EFF6FF',
+                      border: '1px solid #BFDBFE',
+                      color: '#1D4ED8',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={`Open 360° Report for ${site.clientName || site.company || site.name}`}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#DBEAFE'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
+                  >
+                    <span>360°</span>
+                  </button>
+
                   <button
                     onClick={(e) => handleOpenView(site, e)}
                     style={{
@@ -881,18 +908,40 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                     </div>
                   </div>
 
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
-                    border: '1px solid #DBEAFE',
-                    flexShrink: 0
-                  }}>
-                    {site.amcStatus || 'Active'}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('client-360-reports', site.clientName || site.company || site.name);
+                      }}
+                      style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        color: '#1D4ED8',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}
+                      title={`Open 360° Report for ${site.clientName || site.company || site.name}`}
+                    >
+                      360°
+                    </button>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      padding: '2px 7px',
+                      borderRadius: '4px',
+                      backgroundColor: '#EFF6FF',
+                      color: '#2563EB',
+                      border: '1px solid #DBEAFE'
+                    }}>
+                      {site.amcStatus || 'Active'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Details Grid (Phone, PO, Email) */}

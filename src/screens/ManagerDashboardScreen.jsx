@@ -1158,25 +1158,25 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
-          {/* Client AMC Intelligence Reports Button (Lightweight & Compact) */}
+          {/* 360° Symbol Quick Access Button */}
           <button
             className="hdr-btn"
             onClick={() => onNavigate('client-360-reports')}
             style={{
-              height:'30px', padding:'0 11px', borderRadius:'7px',
-              display:'inline-flex', alignItems:'center', gap:'6px',
-              backgroundColor:'#FFFFFF', border:'1px solid #E2E8F0',
-              color:'#0F172A', fontSize:'12px', fontWeight:600,
+              height:'30px', padding:'0 10px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'5px',
+              backgroundColor:'#EFF6FF', border:'1px solid #BFDBFE',
+              color:'#1D4ED8', fontSize:'12px', fontWeight:700,
               cursor:'pointer',
-              boxShadow:'0 1px 2px rgba(0,0,0,0.03)',
+              boxShadow:'0 1px 2px rgba(37,99,235,0.06)',
               transition:'all 0.15s ease'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; e.currentTarget.style.borderColor = '#BFDBFE'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
+            title="Open Client 360° Reports"
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#DBEAFE'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
           >
-            <ShieldCheck size={13} color="#2563EB" />
-            <span>Client AMC Reports</span>
-            <span style={{ fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #DBEAFE' }}>360°</span>
+            <ShieldCheck size={14} color="#2563EB" />
+            <span>360°</span>
           </button>
 
           {/* Supabase Backup */}
@@ -1333,77 +1333,6 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             setBreakdownPage(1);
           }}
         />
-      </div>
-
-      {/* ═══ CLIENT AMC INTELLIGENCE 360° QUICK ACCESS BANNER (Lightweight & Compact Light Theme) ═══ */}
-      <div className="dash-row" style={{
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderLeft: '4px solid #2563EB',
-        borderRadius: '10px',
-        padding: '10px 14px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '10px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            backgroundColor: '#EFF6FF',
-            border: '1px solid #DBEAFE',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#2563EB',
-            flexShrink: 0
-          }}>
-            <ShieldCheck size={18} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
-                Client 360° AMC Intelligence & Executive Dossiers
-              </span>
-              <span style={{ fontSize: '9px', fontWeight: 700, padding: '1.5px 5px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
-                MANAGEMENT BLUEPRINT
-              </span>
-            </div>
-            <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '1px', lineHeight: 1.35 }}>
-              Live contract health scores, asset registers, punch defect aging, and exportable multi-sheet Excel workbooks.
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={() => onNavigate('client-360-reports')}
-          style={{
-            height: '28px',
-            padding: '0 12px',
-            borderRadius: '6px',
-            backgroundColor: '#2563EB',
-            border: 'none',
-            color: '#FFFFFF',
-            fontSize: '11.5px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
-            transition: 'all 0.15s ease',
-            flexShrink: 0
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1D4ED8'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563EB'; }}
-        >
-          <span>Open Client AMC Reports</span>
-          <ArrowRight size={13} />
-        </button>
       </div>
 
       {/* ═══ 3. MONTHLY AMC VISITS & PUNCH ANALYTICS (Requested MNC Dual-Axis Chart) ═══ */}
@@ -1995,24 +1924,57 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
 
                     <div style={{
                       flexShrink: 0,
-                      textAlign: 'right',
-                      fontSize: '12px',
-                      fontVariantNumeric: 'tabular-nums'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}>
-                      <p style={{
-                        margin: 0,
-                        fontWeight: 500,
-                        color: isDone ? '#059669' : isMiddle ? '#0B6B63' : '#D97706'
+                      <div style={{
+                        textAlign: 'right',
+                        fontSize: '12px',
+                        fontVariantNumeric: 'tabular-nums'
                       }}>
-                        {isDone ? '✓ 100% Complete' : `${pct}% (${site.inspectedPositions}/${site.totalPositions})`}
-                      </p>
-                      <p style={{
-                        margin: '2px 0 0 0',
-                        fontSize: '11px',
-                        color: '#9CA3AF'
-                      }}>
-                        {site.city}
-                      </p>
+                        <p style={{
+                          margin: 0,
+                          fontWeight: 500,
+                          color: isDone ? '#059669' : isMiddle ? '#0B6B63' : '#D97706'
+                        }}>
+                          {isDone ? '✓ 100% Complete' : `${pct}% (${site.inspectedPositions}/${site.totalPositions})`}
+                        </p>
+                        <p style={{
+                          margin: '2px 0 0 0',
+                          fontSize: '11px',
+                          color: '#9CA3AF'
+                        }}>
+                          {site.city}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate('client-360-reports', site.clientName || site.name);
+                        }}
+                        style={{
+                          height: '24px',
+                          padding: '0 7px',
+                          borderRadius: '5px',
+                          backgroundColor: '#EFF6FF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1D4ED8',
+                          fontSize: '10.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title={`Open 360° Report for ${site.name}`}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#DBEAFE'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
+                      >
+                        360°
+                      </button>
                     </div>
                   </div>
                 </li>
@@ -3550,18 +3512,46 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
                                     </span>
                                   </td>
                                   <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                    <span
-                                      style={{
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        color: '#0B6B63',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '3px'
-                                      }}
-                                    >
-                                      View Assets <ArrowRight size={11} />
-                                    </span>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onNavigate('client-360-reports', client.clientName);
+                                        }}
+                                        style={{
+                                          height: '24px',
+                                          padding: '0 8px',
+                                          borderRadius: '5px',
+                                          backgroundColor: '#EFF6FF',
+                                          border: '1px solid #BFDBFE',
+                                          color: '#1D4ED8',
+                                          fontSize: '10.5px',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        title={`Open 360° Report for ${client.clientName}`}
+                                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#DBEAFE'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
+                                      >
+                                        <span>360°</span>
+                                      </button>
+                                      <span
+                                        style={{
+                                          fontSize: '11px',
+                                          fontWeight: 600,
+                                          color: '#0B6B63',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px'
+                                        }}
+                                      >
+                                        View Assets <ArrowRight size={11} />
+                                      </span>
+                                    </div>
                                   </td>
                                 </tr>
                               );
