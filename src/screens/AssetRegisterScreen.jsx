@@ -1078,18 +1078,20 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                Unit Serial Number: <span style={{ color: 'var(--brand-crimson)' }}>*</span>
+                Asset Serial Number (Cylinder / Equipment Sr No): <span style={{ color: 'var(--brand-crimson)' }}>*</span>
               </label>
               <input
                 type="text"
                 className="input-field"
-                placeholder="e.g. IFS-2024-DCP-8821"
+                placeholder="e.g. Enter MFR Serial No or Asset Tag (e.g. CYL-8821)"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 required
                 style={{ fontWeight: 700 }}
               />
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Unique unit tag on cylinder body</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Physical serial number embossed on equipment body / manufacturer plate (customizable at time of assignment)
+              </span>
             </div>
 
             <div>
@@ -1475,9 +1477,14 @@ export default function AssetRegisterScreen({ onNavigate, onAssetRegistered, pre
             </div>
 
             <div>
-              <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Equipment Unit Identity:</span>
+              <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Asset Serial Number:</span>
               <strong style={{ color: 'var(--brand-crimson)', fontSize: '0.95rem' }}>{serialNumber}</strong>
-              <div>{equipmentType} ({capacity})</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{equipmentType} ({capacity})</div>
+              {prefilledQR && (
+                <div style={{ fontSize: '0.75rem', color: '#1E40AF', marginTop: '3px', fontWeight: 600 }}>
+                  Linked QR Sticker: {prefilledQR.displayNo || prefilledQR.token}
+                </div>
+              )}
             </div>
 
             <div>
