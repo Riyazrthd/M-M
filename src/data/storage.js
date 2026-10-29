@@ -17,7 +17,8 @@ export const STORAGE_KEYS = {
   PLANT_TECHNICIANS: 'ifspl_amc_plant_technicians',
   QR_REGISTRY: 'ifspl_amc_qr_registry',
   QR_SEQUENCE: 'ifspl_amc_qr_sequence',
-  DELETED_SITE_IDS: 'ifspl_amc_deleted_sites'
+  DELETED_SITE_IDS: 'ifspl_amc_deleted_sites',
+  PUNCH_ITEMS: 'ifspl_amc_punch_items'
 };
 
 /**
@@ -2417,5 +2418,729 @@ export function completeChecklistSession(visitId, templateId) {
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(visits));
   notifyDataChanged('checklist_session_completed', visitId);
   return { success: true, session };
+}
+
+// ============================================================================
+// CLIENT 360° AMC INTELLIGENCE & PUNCH / DEFECT REPORTING ENGINE
+// ============================================================================
+
+/**
+ * Discovers and seeds default punch items from actual recorded visits and defective positions
+ */
+function initializeDefaultPunchItems() {
+  const visits = getVisits();
+  const positions = getPositions();
+  const sites = getSites();
+  const list = [];
+  let seq = 1;
+
+  // 1. Scan visits for any checklist observation with NOT_OK status
+  visits.forEach(v => {
+    const s = sites.find(site => site.id === v.siteId);
+    const clientName = s?.clientName || s?.company || s?.name || v.customerName || 'Industrial Client';
+    const siteName = s?.plantFacility || s?.name || v.siteName || 'Plant Facility';
+
+    const answers = v.checklistAnswers || {};
+    Object.entries(answers).forEach(([posId, ans]) => {
+      const pos = positions.find(p => p.positionId === posId);
+      const items = ans.items || {};
+
+      Object.entries(items).forEach(([itemNo, itemVal]) => {
+        if (itemVal && (itemVal.status === 'NOT_OK' || itemVal.status === 'FAIL' || itemVal.status === 'X')) {
+          const punchNo = `PNC-2026-${String(seq++).padStart(3, '0')}`;
+          const isCritical = itemNo === '2' || itemNo === 2 || (itemVal.reason && itemVal.reason.toLowerCase().includes('pressure'));
+          list.push({
+            id: `PUNCH-${v.visitId || v.id}-${posId}-${itemNo}`,
+            punchNo,
+            punchDate: v.date || '2026-10-26',
+            clientName,
+            siteId: v.siteId,
+            siteName,
+            visitId: v.visitId || v.id,
+            positionId: posId,
+            qrCode: pos?.qrCode || `IFS-QR-${posId}`,
+            assetName: pos?.currentEquipment?.equipmentName || pos?.equipmentType || 'Fire Equipment',
+            assetCategory: pos?.equipmentCategory || 'Fire Extinguisher',
+            assetType: pos?.equipmentType || 'Fire Safety Asset',
+            location: [pos?.area, pos?.location].filter(Boolean).join(' — ') || 'Plant Facility Bay',
+            failedItemNo: Number(itemNo) || itemNo,
+            failedItemTitle: itemVal.title || `Inspection Parameter #${itemNo}`,
+            defectObservation: itemVal.reason || itemVal.remarks || 'Defect identified during scheduled AMC maintenance',
+            defectCategory: isCritical ? 'Hydraulic / Pressure Integrity' : 'Mechanical & Housing Integrity',
+            severity: isCritical ? 'Critical' : 'Major',
+            technicianName: v.technicianName || v.serviceEngineer || 'Ramesh Patel',
+            technicianBadge: v.technicianBadge || 'IFS-SE-041',
+            responsibleDept: 'IFS Field Technical Team',
+            rectificationOwner: v.technicianName || 'Ramesh Patel',
+            targetDate: '2026-11-05',
+            actualRectificationDate: null,
+            status: 'Open',
+            closureRemarks: '',
+            evidencePhoto: itemVal.photo || (itemVal.photos && itemVal.photos[0]?.url) || null,
+            closurePhoto: null,
+            createdAt: v.startedAt || new Date().toISOString()
+          });
+        }
+      });
+    });
+  });
+
+  // 2. Add sample historical closed and minor punch records for realistic lifecycle audit
+  if (list.length > 0) {
+    const first = list[0];
+    list.push({
+      id: `PUNCH-HIST-001`,
+      punchNo: `PNC-2026-${String(seq++).padStart(3, '0')}`,
+      punchDate: '2026-10-18',
+      clientName: first.clientName,
+      siteId: first.siteId,
+      siteName: first.siteName,
+      visitId: first.visitId,
+      positionId: first.positionId,
+      qrCode: first.qrCode,
+      assetName: first.assetName,
+      assetCategory: first.assetCategory,
+      assetType: first.assetType,
+      location: first.location,
+      failedItemNo: 7,
+      failedItemTitle: 'External Paint & Identification Stenciling',
+      defectObservation: 'Paint flaking on discharge horn mounting bracket edge',
+      defectCategory: 'Corrosion & Surface Protection',
+      severity: 'Minor',
+      technicianName: 'Amit Trivedi',
+      technicianBadge: 'IFS-SE-042',
+      responsibleDept: 'IFS Field Technical Team',
+      rectificationOwner: 'Amit Trivedi',
+      targetDate: '2026-10-25',
+      actualRectificationDate: '2026-10-22',
+      status: 'Closed',
+      closureRemarks: 'Bracket sanded, primed and recoated with Signal Red IS 5 epoxy paint. Verified compliant.',
+      evidencePhoto: null,
+      closurePhoto: null,
+      createdAt: '2026-10-18T10:30:00.000Z'
+    });
+
+    list.push({
+      id: `PUNCH-HIST-002`,
+      punchNo: `PNC-2026-${String(seq++).padStart(3, '0')}`,
+      punchDate: '2026-10-20',
+      clientName: first.clientName,
+      siteId: first.siteId,
+      siteName: first.siteName,
+      visitId: first.visitId,
+      positionId: first.positionId,
+      qrCode: first.qrCode,
+      assetName: first.assetName,
+      assetCategory: first.assetCategory,
+      assetType: first.assetType,
+      location: first.location,
+      failedItemNo: 1,
+      failedItemTitle: 'Tamper Seal & Safety Pin Verification',
+      defectObservation: 'Plastic tamper wire missing; lock pin loose in handle hole',
+      defectCategory: 'Mechanical & Housing Integrity',
+      severity: 'Major',
+      technicianName: 'Jignesh Solanki',
+      technicianBadge: 'IFS-TECH-019',
+      responsibleDept: 'IFS Field Technical Team',
+      rectificationOwner: 'Jignesh Solanki',
+      targetDate: '2026-10-24',
+      actualRectificationDate: '2026-10-23',
+      status: 'Closed',
+      closureRemarks: 'Replaced pull pin and installed new embossed serial tamper seal (Seal No: IFS-SEAL-8891). Tested trigger safety latch.',
+      evidencePhoto: null,
+      closurePhoto: null,
+      createdAt: '2026-10-20T11:15:00.000Z'
+    });
+  }
+
+  return list;
+}
+
+/**
+ * Retrieve all punch items (optionally filtered by client name or site ID)
+ */
+export function getPunchItems(filterClientOrSiteId = null) {
+  let list = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PUNCH_ITEMS);
+    if (raw) {
+      list = JSON.parse(raw);
+    }
+  } catch (e) {
+    list = [];
+  }
+
+  if (!list || list.length === 0) {
+    list = initializeDefaultPunchItems();
+    try {
+      localStorage.setItem(STORAGE_KEYS.PUNCH_ITEMS, JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  if (!filterClientOrSiteId || filterClientOrSiteId === 'ALL') {
+    return list;
+  }
+
+  const query = filterClientOrSiteId.trim().toLowerCase();
+  return list.filter(item => {
+    return (item.siteId && item.siteId.toLowerCase() === query) ||
+           (item.clientName && item.clientName.toLowerCase() === query) ||
+           (item.siteName && item.siteName.toLowerCase() === query);
+  });
+}
+
+/**
+ * Updates a punch item (status, remarks, closure date, photo)
+ */
+export function updatePunchItem(punchId, updates = {}) {
+  const list = getPunchItems();
+  const idx = list.findIndex(p => p.id === punchId || p.punchNo === punchId);
+  if (idx === -1) return { success: false, error: 'Punch item not found' };
+
+  list[idx] = {
+    ...list[idx],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem(STORAGE_KEYS.PUNCH_ITEMS, JSON.stringify(list));
+  notifyDataChanged('punch_item_updated', punchId, list[idx]);
+  return { success: true, punchItem: list[idx] };
+}
+
+/**
+ * Creates a new punch item
+ */
+export function addPunchItem(punchData) {
+  const list = getPunchItems();
+  const seq = list.length + 1;
+  const newPunch = {
+    id: punchData.id || `PUNCH-MANUAL-${Date.now()}`,
+    punchNo: punchData.punchNo || `PNC-2026-${String(seq).padStart(3, '0')}`,
+    punchDate: punchData.punchDate || new Date().toISOString().substring(0, 10),
+    clientName: punchData.clientName || 'Client Organization',
+    siteId: punchData.siteId || 'SITE-001',
+    siteName: punchData.siteName || 'Facility Plant',
+    visitId: punchData.visitId || 'VISIT-CURRENT',
+    positionId: punchData.positionId || 'POS-001',
+    qrCode: punchData.qrCode || 'IFS-QR-000001',
+    assetName: punchData.assetName || 'Fire Safety Equipment',
+    assetCategory: punchData.assetCategory || 'Fire Extinguisher',
+    assetType: punchData.assetType || 'Fire Extinguisher',
+    location: punchData.location || 'Facility Area',
+    failedItemNo: punchData.failedItemNo || 1,
+    failedItemTitle: punchData.failedItemTitle || 'Operational Defect',
+    defectObservation: punchData.defectObservation || 'Defect noted',
+    defectCategory: punchData.defectCategory || 'Mechanical',
+    severity: punchData.severity || 'Major',
+    technicianName: punchData.technicianName || 'Ramesh Patel',
+    technicianBadge: punchData.technicianBadge || 'IFS-SE-041',
+    responsibleDept: 'IFS Field Technical Team',
+    rectificationOwner: punchData.rectificationOwner || punchData.technicianName || 'Ramesh Patel',
+    targetDate: punchData.targetDate || '2026-11-10',
+    actualRectificationDate: null,
+    status: 'Open',
+    closureRemarks: '',
+    evidencePhoto: punchData.evidencePhoto || null,
+    closurePhoto: null,
+    createdAt: new Date().toISOString()
+  };
+
+  list.unshift(newPunch);
+  localStorage.setItem(STORAGE_KEYS.PUNCH_ITEMS, JSON.stringify(list));
+  notifyDataChanged('punch_item_added', newPunch.id, newPunch);
+  return { success: true, punchItem: newPunch };
+}
+
+/**
+ * Computes the complete 360° AMC Intelligence Summary for a given client
+ */
+export function getClient360Summary(clientIdentifier = null) {
+  const sites = getSites();
+  const positions = getPositions();
+  const visits = getVisits();
+  const punches = getPunchItems();
+
+  let matchedSites = [];
+  if (clientIdentifier) {
+    const q = clientIdentifier.trim().toLowerCase();
+    matchedSites = sites.filter(s => {
+      const cName = (s.clientName || s.name || s.company || '').toLowerCase();
+      const sId = (s.id || '').toLowerCase();
+      const code = (s.code || '').toLowerCase();
+      return cName === q || sId === q || code === q || cName.includes(q);
+    });
+  }
+
+  if (matchedSites.length === 0 && sites.length > 0) {
+    matchedSites = [sites[0]];
+  }
+
+  const primarySite = matchedSites[0] || {};
+  const clientName = primarySite.clientName || primarySite.name || primarySite.company || 'Client Organization';
+  const clientCode = primarySite.code || primarySite.id || 'CUS-01';
+  const siteIds = new Set(matchedSites.map(s => s.id));
+
+  // 1. Assets for this client across all sites
+  const clientAssets = positions.filter(p => siteIds.has(p.siteId));
+
+  // 2. Visits for this client
+  const clientVisits = visits.filter(v => siteIds.has(v.siteId));
+
+  // 3. Punch items for this client
+  const clientPunches = punches.filter(p => 
+    siteIds.has(p.siteId) || 
+    (p.clientName && p.clientName.toLowerCase() === clientName.toLowerCase())
+  );
+
+  // 4. Asset category breakdowns
+  let extinguishersCount = 0;
+  let hydrantsCount = 0;
+  let hoseBoxesCount = 0;
+  let hoseReelsCount = 0;
+  let sprinklersCount = 0;
+  let pumpsCount = 0;
+  let alarmsCount = 0;
+  let otherAssetsCount = 0;
+
+  clientAssets.forEach(p => {
+    const cat = (p.equipmentCategory || '').toLowerCase();
+    const type = (p.equipmentType || '').toLowerCase();
+    const tmpl = (p.templateId || '').toLowerCase();
+
+    if (cat.includes('extinguisher') || type.includes('extinguisher') || tmpl === 'cl-11' || isFireExtinguisherAsset(p)) {
+      extinguishersCount++;
+    } else if (cat.includes('hydrant') || type.includes('hydrant') || tmpl === 'cl-01' || tmpl === 'cl-02') {
+      hydrantsCount++;
+    } else if (cat.includes('hose box') || type.includes('hose box') || tmpl === 'cl-03') {
+      hoseBoxesCount++;
+    } else if (cat.includes('hose reel') || type.includes('hose reel') || tmpl === 'cl-04') {
+      hoseReelsCount++;
+    } else if (cat.includes('sprinkler') || type.includes('sprinkler') || tmpl === 'cl-06') {
+      sprinklersCount++;
+    } else if (cat.includes('pump') || type.includes('pump') || tmpl === 'cl-05') {
+      pumpsCount++;
+    } else if (cat.includes('alarm') || type.includes('alarm') || tmpl === 'cl-10') {
+      alarmsCount++;
+    } else {
+      otherAssetsCount++;
+    }
+  });
+
+  const totalAssets = clientAssets.length;
+  const inspectedAssets = clientAssets.filter(p => p.inspectionStatus && p.inspectionStatus.startsWith('Inspected')).length;
+  const pendingAssets = Math.max(0, totalAssets - inspectedAssets);
+  const notOkayAssets = clientAssets.filter(p => p.inspectionStatus === 'Inspected - Attention');
+  const okAssets = clientAssets.filter(p => p.inspectionStatus === 'Inspected - OK');
+
+  // Contract Details & Visits
+  const plannedVisits = matchedSites.reduce((sum, s) => sum + Number(s.noOfVisits || 4), 0);
+  const completedVisits = clientVisits.filter(v => 
+    v.status === 'Completed' || 
+    v.status === 'Completed with Exceptions' || 
+    v.status === 'Signed & Completed'
+  ).length;
+  const remainingVisits = Math.max(0, plannedVisits - completedVisits);
+
+  // Expiry & Renewal
+  const expiryDate = primarySite.amcExpiryDate || '2027-03-31';
+  const today = new Date();
+  const expD = new Date(expiryDate);
+  const diffTime = expD.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  let renewalStatus = 'Active';
+  let renewalBadgeColor = '#059669';
+  if (diffDays <= 0) {
+    renewalStatus = 'Expired';
+    renewalBadgeColor = '#DC2626';
+  } else if (diffDays <= 30) {
+    renewalStatus = 'Renewal Due (Within 30 Days)';
+    renewalBadgeColor = '#DC2626';
+  } else if (diffDays <= 60) {
+    renewalStatus = 'Renewal Due (Within 60 Days)';
+    renewalBadgeColor = '#D97706';
+  } else if (diffDays <= 90) {
+    renewalStatus = 'Advance Renewal (Within 90 Days)';
+    renewalBadgeColor = '#2563EB';
+  }
+
+  // Punch metrics
+  const totalPunches = clientPunches.length;
+  const openPunches = clientPunches.filter(p => p.status === 'Open' || p.status === 'In Progress' || p.status === 'Awaiting Material').length;
+  const closedPunches = clientPunches.filter(p => p.status === 'Closed' || p.status === 'Rectified').length;
+  const criticalPunches = clientPunches.filter(p => p.severity === 'Critical' && (p.status === 'Open' || p.status === 'In Progress')).length;
+  const overduePunches = clientPunches.filter(p => {
+    if (p.status === 'Closed' || p.status === 'Rectified') return false;
+    if (!p.targetDate) return false;
+    return new Date(p.targetDate).getTime() < today.getTime();
+  }).length;
+  const punchClosurePct = totalPunches > 0 ? Math.round((closedPunches / totalPunches) * 100) : 100;
+
+  // Punch Aging Buckets
+  const agingBuckets = {
+    '0-7': 0,
+    '8-15': 0,
+    '16-30': 0,
+    '31-60': 0,
+    '60+': 0
+  };
+
+  clientPunches.forEach(p => {
+    if (p.status !== 'Closed' && p.status !== 'Rectified') {
+      const pDate = new Date(p.punchDate || p.createdAt || today);
+      const age = Math.max(0, Math.floor((today.getTime() - pDate.getTime()) / (1000 * 60 * 60 * 24)));
+      if (age <= 7) agingBuckets['0-7']++;
+      else if (age <= 15) agingBuckets['8-15']++;
+      else if (age <= 30) agingBuckets['16-30']++;
+      else if (age <= 60) agingBuckets['31-60']++;
+      else agingBuckets['60+']++;
+    }
+  });
+
+  // Client Health Score (0-100) dynamically calculated from real data
+  const visitScore = plannedVisits > 0 ? Math.min(25, (completedVisits / plannedVisits) * 25) : 25;
+  const inspectionScore = totalAssets > 0 ? ((inspectedAssets / totalAssets) * 35) : 35;
+  let punchScore = (punchClosurePct / 100) * 25;
+  punchScore -= (criticalPunches * 6);
+  punchScore -= (overduePunches * 3);
+  punchScore = Math.max(0, punchScore);
+
+  let contractScore = 15;
+  if (diffDays <= 0) contractScore = 0;
+  else if (diffDays <= 30) contractScore = 7;
+  else if (diffDays <= 60) contractScore = 11;
+
+  const healthScore = Math.max(5, Math.min(100, Math.round(visitScore + inspectionScore + punchScore + contractScore)));
+
+  let healthRating = 'Healthy';
+  let healthLabel = 'AMC On Track';
+  let healthColor = '#2563EB';
+  if (healthScore >= 90) {
+    healthRating = 'Excellent';
+    healthLabel = 'AMC Fully Compliant';
+    healthColor = '#059669';
+  } else if (healthScore >= 75) {
+    healthRating = 'Healthy';
+    healthLabel = 'AMC On Track';
+    healthColor = '#2563EB';
+  } else if (healthScore >= 60) {
+    healthRating = 'Moderate';
+    healthLabel = 'Attention Required';
+    healthColor = '#D97706';
+  } else {
+    healthRating = 'Critical Risk';
+    healthLabel = 'Urgent Review Needed';
+    healthColor = '#DC2626';
+  }
+
+  // Technicians History
+  const techMap = {};
+  clientVisits.forEach(v => {
+    const tName = v.technicianName || v.serviceEngineer || 'Ramesh Patel';
+    const tBadge = v.technicianBadge || 'IFS-SE-041';
+    if (!techMap[tName]) {
+      techMap[tName] = {
+        name: tName,
+        badge: tBadge,
+        visitsCount: 0,
+        completedCount: 0,
+        inspectedAssetsTotal: 0,
+        punchesRaised: 0,
+        rectificationsCompleted: 0,
+        lastVisitDate: v.date || '—',
+        sitesVisited: new Set()
+      };
+    }
+    techMap[tName].visitsCount++;
+    if (v.status.includes('Completed')) techMap[tName].completedCount++;
+    techMap[tName].inspectedAssetsTotal += (v.inspectedAssets || Object.keys(v.checklistAnswers || {}).length);
+    techMap[tName].sitesVisited.add(v.siteName || v.siteId);
+    if (!techMap[tName].lastVisitDate || new Date(v.date) > new Date(techMap[tName].lastVisitDate)) {
+      techMap[tName].lastVisitDate = v.date;
+    }
+  });
+
+  const techniciansList = Object.values(techMap).map(t => ({
+    ...t,
+    sitesVisited: Array.from(t.sitesVisited)
+  }));
+
+  // Replaced Assets History
+  const replacementHistory = [];
+  clientAssets.forEach(pos => {
+    if (Array.isArray(pos.history) && pos.history.length > 0) {
+      pos.history.forEach(h => {
+        if (h.event && (h.event.includes('Replacement') || h.event.includes('Swap'))) {
+          replacementHistory.push({
+            positionId: pos.positionId,
+            qrCode: pos.qrCode,
+            assetName: pos.currentEquipment?.equipmentName || pos.equipmentType,
+            timestamp: h.timestamp,
+            reason: h.reason,
+            removedCylinder: h.removedCylinder,
+            replacementCylinder: h.replacementCylinder,
+            technician: h.technician,
+            notes: h.notes
+          });
+        }
+      });
+    }
+  });
+
+  // Sites summary list
+  const sitesList = matchedSites.map(s => {
+    const sPositions = clientAssets.filter(p => p.siteId === s.id);
+    const sInspected = sPositions.filter(p => p.inspectionStatus && p.inspectionStatus.startsWith('Inspected')).length;
+    const sPending = Math.max(0, sPositions.length - sInspected);
+    const sDefects = sPositions.filter(p => p.inspectionStatus === 'Inspected - Attention').length;
+    const sVisits = clientVisits.filter(v => v.siteId === s.id);
+    const lastVisit = sVisits[0]?.date || s.scheduledDate || '2026-10-26';
+
+    return {
+      siteId: s.id,
+      siteName: s.plantFacility || s.name || 'Plant Facility',
+      siteCode: s.code || s.id,
+      address: s.address || 'Industrial Estate, GIDC',
+      city: s.city || 'Vadodara',
+      contactPerson: s.clientContact || 'Site Safety In-Charge',
+      contactPhone: s.contactPhone || '+91 98000 00000',
+      totalAssets: sPositions.length,
+      inspectedAssets: sInspected,
+      pendingAssets: sPending,
+      defectiveAssets: sDefects,
+      frequency: s.amcType || s.frequency || 'Quarterly',
+      lastVisitDate: lastVisit,
+      nextScheduledVisit: s.scheduledDate || '2026-11-20',
+      status: s.status || (sPending === 0 && sPositions.length > 0 ? 'Completed' : 'In Progress')
+    };
+  });
+
+  // Detailed Asset Register with all 21 fields
+  const assetRegister = clientAssets.map((pos, idx) => {
+    const isDefective = pos.inspectionStatus === 'Inspected - Attention';
+    const isInspectedOk = pos.inspectionStatus === 'Inspected - OK';
+    let condition = 'Pending Inspection';
+    if (isDefective) condition = 'Defective';
+    else if (isInspectedOk) condition = 'Okay';
+    else if (pos.status === 'Retired') condition = 'Retired';
+    else if (pos.status === 'Replaced') condition = 'Replaced';
+
+    const pOpenPunches = clientPunches.filter(p => p.positionId === pos.positionId && (p.status === 'Open' || p.status === 'In Progress')).length;
+
+    return {
+      srNo: idx + 1,
+      assetQrNumber: pos.qrCode || `IFS-QR-${pos.positionId}`,
+      assetId: pos.positionId || pos.id,
+      assetName: pos.currentEquipment?.equipmentName || pos.equipmentType || 'Fire Safety Asset',
+      assetCategory: pos.equipmentCategory || (pos.templateId === 'CL-03' ? 'Hose Box' : 'Fire Extinguisher'),
+      assetType: pos.currentEquipment?.type || pos.equipmentType || 'Fire Protection Unit',
+      siteName: primarySite.plantFacility || primarySite.name || 'Plant Facility',
+      departmentLocation: [pos.area, pos.location].filter(Boolean).join(' — ') || 'Plant Floor',
+      manufacturer: pos.currentEquipment?.make || pos.currentEquipment?.manufacturer || 'Indus SafeGuard (IS 15683)',
+      modelNumber: pos.currentEquipment?.model || 'IFS-PRO-2026',
+      serialNumber: pos.currentEquipment?.serialNo || pos.currentEquipment?.serialNumber || '—',
+      capacityRating: pos.currentEquipment?.capacity || pos.capacity || '—',
+      installationDate: pos.currentEquipment?.installationDate || pos.installationDate || '2022-04-10',
+      commissioningDate: pos.commissioningDate || pos.installationDate || '2022-04-15',
+      lastInspectionDate: pos.lastInspectionDate || pos.inspectionHistory?.[0]?.inspectionDate || '—',
+      nextInspectionDueDate: pos.currentEquipment?.nextServiceDueDate || pos.currentEquipment?.nextHydroTestDue || '2027-01-15',
+      assetStatus: pos.operationalStatus || pos.status || 'Active in Position',
+      amcCoverageStatus: 'Covered under Active AMC',
+      assetCondition: condition,
+      lastInspectionResult: isDefective ? 'Not Okay (Attention Required)' : (isInspectedOk ? 'Okay (Pass)' : 'Pending Inspection'),
+      openPunchCount: pOpenPunches,
+      pendingRectificationCount: pOpenPunches
+    };
+  });
+
+  // Assets Found Not Okay
+  const assetsNotOkay = clientAssets
+    .filter(p => p.inspectionStatus === 'Inspected - Attention')
+    .map((p, idx) => {
+      const punch = clientPunches.find(pnc => pnc.positionId === p.positionId);
+      return {
+        srNo: idx + 1,
+        assetId: p.positionId,
+        qrNumber: p.qrCode,
+        assetType: p.equipmentType,
+        siteName: primarySite.plantFacility || primarySite.name,
+        location: [p.area, p.location].filter(Boolean).join(' — '),
+        inspectionDate: p.lastInspectionDate || '2026-10-26',
+        visitNumber: punch?.visitId || 'VISIT-CURRENT',
+        technician: punch?.technicianName || 'Ramesh Patel',
+        failedParameter: punch?.failedItemTitle || 'Housing & Component Integrity',
+        observation: punch?.defectObservation || 'Defect noted during inspection',
+        severity: punch?.severity || 'Major',
+        punchNumber: punch?.punchNo || 'PNC-2026-001',
+        rectificationStatus: punch?.status || 'Open',
+        lastUpdate: punch?.updatedAt || '2026-10-26',
+        nextAction: punch?.status === 'Open' ? 'Dispatch IFS replacement spare & recertify' : 'Verified closed'
+      };
+    });
+
+  // Pending Assets with Justification Reasons
+  const pendingAssetsList = clientAssets
+    .filter(p => !p.inspectionStatus || !p.inspectionStatus.startsWith('Inspected'))
+    .map((p, idx) => {
+      const visit = clientVisits[0];
+      const just = visit?.pendingJustifications?.[p.positionId];
+      return {
+        srNo: idx + 1,
+        assetId: p.positionId,
+        qrNumber: p.qrCode,
+        siteLocation: [p.area, p.location].filter(Boolean).join(' — '),
+        pendingReason: just?.reason || 'Scheduled for Next AMC Field Rotation',
+        explanation: just?.explanation || just?.remarks || 'Asset scheduled under planned quarterly batch.',
+        assignedTechnician: visit?.technicianName || 'Ramesh Patel',
+        scheduledDate: primarySite.scheduledDate || '2026-10-26',
+        currentStatus: 'Pending Inspection'
+      };
+    });
+
+  return {
+    clientName,
+    clientCode,
+    contactPerson: primarySite.clientContact || 'Primary Contact',
+    contactPhone: primarySite.contactPhone || '+91 98000 00000',
+    email: primarySite.email || 'contact@client.org',
+    billingAddress: primarySite.address || 'Industrial Estate, GIDC, Gujarat',
+    city: primarySite.city || 'Vadodara',
+    industry: 'Chemicals, Petrochemicals & Heavy Manufacturing',
+    coordinator: 'Sanjay Sharma (Lead Technical AMC Coordinator)',
+    amcStatus: primarySite.status === 'Completed' ? 'Completed' : (diffDays <= 0 ? 'Expired' : 'Active'),
+    reportGeneratedAt: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-US'),
+    reportPeriod: `FY ${new Date().getFullYear()}-${new Date().getFullYear() + 1} (Q3)`,
+    financialYear: `2026-2027`,
+    statusBadge: {
+      label: renewalStatus,
+      color: renewalBadgeColor
+    },
+    healthScore: {
+      score: healthScore,
+      rating: healthRating,
+      label: healthLabel,
+      color: healthColor,
+      components: {
+        visitRate: Math.round(visitScore * 4),
+        inspectionRate: Math.round(inspectionScore * (100 / 35)),
+        punchClosureRate: punchClosurePct,
+        contractValidityDays: diffDays
+      }
+    },
+    kpis: {
+      contract: {
+        totalContracts: matchedSites.length,
+        activeContracts: diffDays > 0 ? matchedSites.length : 0,
+        expiredContracts: diffDays <= 0 ? matchedSites.length : 0,
+        renewalDueContracts: diffDays <= 60 && diffDays > 0 ? 1 : 0,
+        contractValue: `₹${(totalAssets * 450).toLocaleString('en-IN')}`,
+        visitsScheduled: plannedVisits,
+        visitsCompleted: completedVisits,
+        visitsPending: remainingVisits
+      },
+      asset: {
+        totalAssets,
+        extinguishers: extinguishersCount,
+        hydrants: hydrantsCount,
+        hoseBoxes: hoseBoxesCount,
+        hoseReels: hoseReelsCount,
+        sprinklers: sprinklersCount,
+        pumps: pumpsCount,
+        alarms: alarmsCount,
+        otherAssets: otherAssetsCount,
+        inspectedAssets,
+        pendingAssets,
+        notOkayAssets: notOkayAssets.length,
+        requiringRectification: openPunches
+      },
+      inspection: {
+        totalSiteVisits: clientVisits.length,
+        inspectionsConducted: inspectedAssets,
+        inspectedAssets,
+        inspectionCompletionPct: totalAssets > 0 ? Math.round((inspectedAssets / totalAssets) * 100) : 0,
+        pendingInspections: pendingAssets,
+        missedVisits: 0,
+        completedWithExceptions: clientVisits.filter(v => v.status === 'Completed with Exceptions').length
+      },
+      punch: {
+        totalPunches,
+        openPunches,
+        closedPunches,
+        criticalPunches,
+        overduePunches,
+        punchClosurePct,
+        avgRectificationDays: '3.5 Days'
+      }
+    },
+    contractDetails: {
+      contractNumber: `AMC-IFS-${clientCode}-${new Date().getFullYear()}`,
+      poNumber: primarySite.poNumber || 'PO/IFS/AMC/2026',
+      poDate: primarySite.poDate || '2026-04-01',
+      startDate: primarySite.poDate || '2026-04-01',
+      endDate: expiryDate,
+      duration: '12 Months (1 Year Comprehensive)',
+      amcType: primarySite.amcType || primarySite.frequency || 'Quarterly',
+      frequency: primarySite.frequency || primarySite.amcType || 'Quarterly',
+      plannedVisits,
+      completedVisits,
+      remainingVisits,
+      contractValue: `₹${(totalAssets * 450).toLocaleString('en-IN')}`,
+      billingTerms: 'Quarterly In Arrears on Acceptance of Field Sign-Off (Net 30)',
+      serviceScope: 'Routine AMC Servicing, IS 2190 Pressure Testing, Defect Rectification & Statutory Audit Verification',
+      includedCategories: 'Fire Extinguishers, Hydrants, Hose Boxes, Hose Reels, Alarm Panels',
+      contractCoverage: '100% Comprehensive Parts & Labour for Approved Standard Spares',
+      excludedServices: 'Capital piping replacements exceeding ₹15,000 without written amendment',
+      renewalAlert: renewalStatus,
+      daysToExpiry: diffDays,
+      responsibleCoordinator: 'Sanjay Sharma (Lead AMC Coordinator)'
+    },
+    sites: sitesList,
+    assets: assetRegister,
+    visits: clientVisits,
+    technicians: techniciansList,
+    punches: clientPunches,
+    assetsNotOkay,
+    pendingAssetsList,
+    replacementHistory,
+    agingBuckets
+  };
+}
+
+/**
+ * Returns the aggregated directory list of all registered clients for the Client AMC Reports directory
+ */
+export function getAllClients360List() {
+  const sites = getSites();
+  const clientKeys = new Set();
+  const list = [];
+
+  sites.forEach(s => {
+    const cName = s.clientName || s.name || s.company || 'Client Organization';
+    if (!clientKeys.has(cName)) {
+      clientKeys.add(cName);
+      const summary = getClient360Summary(cName);
+      list.push({
+        clientName: summary.clientName,
+        clientCode: summary.clientCode,
+        sitesCount: summary.sites.length,
+        amcStatus: summary.amcStatus,
+        totalAssets: summary.kpis.asset.totalAssets,
+        inspectedAssets: summary.kpis.asset.inspectedAssets,
+        pendingAssets: summary.kpis.asset.pendingAssets,
+        defectiveAssets: summary.kpis.asset.notOkayAssets,
+        punchClosurePct: summary.kpis.punch.punchClosurePct,
+        nextVisitDate: summary.sites[0]?.nextScheduledVisit || '2026-11-20',
+        contractExpiryDate: summary.contractDetails.endDate,
+        healthScore: summary.healthScore.score,
+        healthRating: summary.healthScore.rating,
+        healthLabel: summary.healthScore.label,
+        healthColor: summary.healthScore.color,
+        summary
+      });
+    }
+  });
+
+  return list.sort((a, b) => b.totalAssets - a.totalAssets);
 }
 

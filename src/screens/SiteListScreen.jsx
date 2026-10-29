@@ -473,6 +473,30 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
               <Download size={18} />
             </button>
 
+            {/* Client 360 Reports Button */}
+            <button
+              onClick={() => onNavigate && onNavigate('client-360-reports')}
+              style={{
+                height: '34px',
+                padding: '0 12px',
+                borderRadius: '8px',
+                backgroundColor: '#0F172A',
+                color: '#FFFFFF',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(15,23,42,0.2)'
+              }}
+              title="Open Client 360° AMC Intelligence Dossiers"
+            >
+              <ShieldCheck size={14} color="#60A5FA" />
+              <span>360° Reports</span>
+            </button>
+
             {/* Dark Green Circular "+" Button */}
             <button
               onClick={handleOpenAdd}
@@ -1382,6 +1406,32 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
               </button>
 
               <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const client = viewClient;
+                    setIsViewModalOpen(false);
+                    if (onNavigate) onNavigate('client-360-reports', client.clientName || client.name);
+                  }}
+                  style={{
+                    height: '38px',
+                    fontSize: '0.84rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: '#0F172A',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0 14px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ShieldCheck size={14} color="#60A5FA" />
+                  <span>Open 360° Report</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsViewModalOpen(false)}

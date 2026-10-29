@@ -1158,6 +1158,27 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
         </div>
 
         <div style={{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap' }}>
+          {/* Client AMC Intelligence Reports Button */}
+          <button
+            className="hdr-btn"
+            onClick={() => onNavigate('client-360-reports')}
+            style={{
+              height:'30px', padding:'0 12px', borderRadius:'7px',
+              display:'inline-flex', alignItems:'center', gap:'6px',
+              backgroundColor:'#0F172A', border:'1px solid #0F172A',
+              color:'#FFFFFF', fontSize:'12px', fontWeight:600,
+              cursor:'pointer',
+              boxShadow:'0 1px 3px rgba(15,23,42,0.2)',
+              transition:'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1E293B'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0F172A'; }}
+          >
+            <ShieldCheck size={13} color="#60A5FA" />
+            <span>Client AMC Reports</span>
+            <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#2563EB', color: '#FFF' }}>360°</span>
+          </button>
+
           {/* Supabase Backup */}
           <button
             className="hdr-btn"
@@ -1312,6 +1333,74 @@ export default function ManagerDashboardScreen({ onNavigate, onSelectSite, onSel
             setBreakdownPage(1);
           }}
         />
+      </div>
+
+      {/* ═══ CLIENT AMC INTELLIGENCE 360° QUICK ACCESS BANNER ═══ */}
+      <div className="dash-row" style={{
+        backgroundColor: '#0F172A',
+        borderRadius: '12px',
+        padding: '16px 20px',
+        color: '#FFFFFF',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '14px',
+        boxShadow: '0 4px 14px rgba(15,23,42,0.12)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '10px',
+            backgroundColor: '#1E293B',
+            border: '1px solid #334155',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#60A5FA'
+          }}>
+            <ShieldCheck size={22} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '-0.01em' }}>
+                Client 360° AMC Intelligence & Executive Dossiers
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px', backgroundColor: '#2563EB', color: '#FFF' }}>
+                MANAGEMENT BLUEPRINT
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>
+              Live contract health scores, asset registers, punch defect aging, technician audit histories, and exportable multi-sheet Excel workbooks.
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => onNavigate('client-360-reports')}
+          style={{
+            height: '34px',
+            padding: '0 16px',
+            borderRadius: '8px',
+            backgroundColor: '#2563EB',
+            border: 'none',
+            color: '#FFFFFF',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 4px rgba(37,99,235,0.3)',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1D4ED8'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563EB'; }}
+        >
+          <span>Open Client AMC Reports</span>
+          <ArrowRight size={14} />
+        </button>
       </div>
 
       {/* ═══ 3. MONTHLY AMC VISITS & PUNCH ANALYTICS (Requested MNC Dual-Axis Chart) ═══ */}

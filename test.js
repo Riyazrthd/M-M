@@ -52,6 +52,9 @@ async function runAllTests() {
   console.log('\n\n');
   const cloudSyncTests = await import('./src/utils/test_instant_cloud_sync.js');
   await cloudSyncTests.runInstantCloudSyncTests();
+  console.log('\n\n');
+  const client360Tests = await import('./src/utils/test_client_360_intelligence.js');
+  await client360Tests.runClient360IntelligenceTests();
 }
 
 runAllTests();

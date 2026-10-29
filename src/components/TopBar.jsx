@@ -27,6 +27,7 @@ export default function TopBar({
     'digital-checklist': 'Digital Inspection Checklist',
     'photo-remarks': 'Defect Evidence & Spares Gallery',
     'visit-summary': 'AMC Visit Summary & Signatures',
+    'client-360-reports': 'Client 360° AMC Intelligence',
     'client-portal': 'Client Compliance Portal'
   };
 

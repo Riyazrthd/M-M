@@ -19,7 +19,8 @@ import {
   Layers,
   HelpCircle,
   PhoneCall,
-  Cloud
+  Cloud,
+  FileText
 } from 'lucide-react';
 import { getCurrentUser, setCurrentUser } from '../data/storage';
 import { DEMO_USERS } from '../data/sampleData';
@@ -73,8 +74,9 @@ export default function Sidebar({
       ]
     },
     {
-      groupTitle: 'Compliance',
+      groupTitle: 'Compliance & Intelligence',
       items: [
+        { id: 'client-360-reports', label: 'Client 360° Reports', icon: FileText, badge: 'New' },
         { id: 'client-portal', label: 'Client Read-Only Portal', icon: ShieldCheck }
       ]
     }

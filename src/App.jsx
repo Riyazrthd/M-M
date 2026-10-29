@@ -22,6 +22,7 @@ import ManagerDashboardScreen from './screens/ManagerDashboardScreen';
 import ClientPortalScreen from './screens/ClientPortalScreen';
 import AssetRegisterScreen from './screens/AssetRegisterScreen';
 import QRManagementScreen from './screens/QRManagementScreen';
+import Client360ReportScreen from './screens/Client360ReportScreen';
 
 import { 
   initStorage, 
@@ -132,6 +133,7 @@ export default function App() {
     initialScan.isInvalidQR ? { token: initialScan.scanCode, error: initialScan.errorMessage } : null
   );
   const [currentUser, setCurrentUserState] = useState(getCurrentUser());
+  const [activeReportClientId, setActiveReportClientId] = useState(null);
 
   // Layout UI state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -190,7 +192,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const navigateTo = (screenId) => {
+  const navigateTo = (screenId, extraData = null) => {
+    if (screenId === 'client-360-reports') {
+      if (typeof extraData === 'string') {
+        setActiveReportClientId(extraData);
+      } else if (extraData && typeof extraData === 'object' && (extraData.clientName || extraData.name)) {
+        setActiveReportClientId(extraData.clientName || extraData.name);
+      } else if (!extraData) {
+        setActiveReportClientId(null);
+      }
+    }
     setCurrentScreen(screenId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -605,6 +616,15 @@ export default function App() {
           {currentScreen === 'manager-dashboard' && (
             <ManagerDashboardScreen
               onNavigate={navigateTo}
+              onSelectSite={handleSelectSite}
+              onSelectPosition={handleSelectPosition}
+            />
+          )}
+
+          {currentScreen === 'client-360-reports' && (
+            <Client360ReportScreen
+              onNavigate={navigateTo}
+              initialClientId={activeReportClientId}
               onSelectSite={handleSelectSite}
               onSelectPosition={handleSelectPosition}
             />

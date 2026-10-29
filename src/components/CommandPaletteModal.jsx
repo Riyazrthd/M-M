@@ -38,6 +38,7 @@ export default function CommandPaletteModal({ isOpen, onClose, onNavigate, onSel
   // Search Results
   const matchingScreens = [
     { id: 'manager-dashboard', title: 'Manager AMC Dashboard', category: 'Screen', icon: LayoutDashboard },
+    { id: 'client-360-reports', title: 'Client 360° AMC Intelligence Reports', category: 'Executive Reports', icon: ShieldCheck },
     { id: 'site-list', title: 'Industrial Sites & Plant AMC', category: 'Screen', icon: Building2 },
     { id: 'asset-register', title: 'Register New Asset & Generate QR', category: 'Workflow', icon: PlusCircle },
     { id: 'qr-scanner', title: 'QR Tag Scanner (Camera & Manual)', category: 'Screen', icon: QrCode },
