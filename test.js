@@ -58,6 +58,9 @@ async function runAllTests() {
   console.log('\n\n');
   const crossDeviceTests = await import('./src/utils/test_cross_device_client_sync.js');
   await crossDeviceTests.runCrossDeviceClientSyncTests();
+  console.log('\n\n');
+  const coverageTests = await import('./src/utils/test_contract_coverage_poka_yoke.js');
+  await coverageTests.runContractCoveragePokaYokeTests();
 }
 
 runAllTests();

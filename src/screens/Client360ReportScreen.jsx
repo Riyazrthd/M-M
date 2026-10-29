@@ -13,7 +13,9 @@ import {
   updatePunchItem, 
   getSites, 
   getPositions, 
-  getVisits 
+  getVisits,
+  processServiceApproval,
+  SERVICE_ACTIVITY_LABELS
 } from '../data/storage';
 import { 
   downloadClient360ExcelWorkbook, 
@@ -897,6 +899,162 @@ export default function Client360ReportScreen({
             <div style={{ marginBottom: '8px' }}><strong>Parts & Labour Coverage:</strong> {contractDetails.contractCoverage}</div>
             <div><strong>Exclusions:</strong> {contractDetails.excludedServices}</div>
           </div>
+
+          {/* Contract Service Entitlement Matrix (Poka-Yoke Automated Coverage) */}
+          <div style={{ marginTop: '24px' }}>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+              Contract Service Entitlement Matrix (Poka-Yoke Automatic Coverage)
+            </h4>
+            <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 12px' }}>Service Activity</th>
+                    <th style={{ padding: '8px 12px' }}>Coverage Entitlement</th>
+                    <th style={{ padding: '8px 12px' }}>Commercial Rule</th>
+                    <th style={{ padding: '8px 12px' }}>Poka-Yoke Automation Rule</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(SERVICE_ACTIVITY_LABELS).map(([actKey, actLabel]) => {
+                    const status = contractDetails.serviceCoverage?.[actKey] || 'Requires Approval';
+                    const isInc = status === 'Included';
+                    const isExc = status === 'Excluded';
+                    const isChg = status === 'Chargeable / Additional Work';
+                    return (
+                      <tr key={actKey} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#0F172A' }}>{actLabel}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            backgroundColor: isInc ? '#DCFCE7' : isExc ? '#FEE2E2' : isChg ? '#DBEAFE' : '#FEF3C7',
+                            color: isInc ? '#15803D' : isExc ? '#B91C1C' : isChg ? '#1E40AF' : '#B45309'
+                          }}>
+                            {status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', color: '#475569' }}>
+                          {isInc ? 'Covered under contract value' : isExc ? 'Outside contract scope — quotation required' : isChg ? 'Billed per rate contract schedule' : 'Pre-authorization mandated'}
+                        </td>
+                        <td style={{ padding: '8px 12px', color: isInc ? '#059669' : '#DC2626', fontWeight: 600 }}>
+                          {isInc ? '✓ Auto-create & assign work' : '⚠️ Stop & generate quotation approval'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Outside-Contract & Chargeable Approval Requests */}
+          {summary.serviceApprovals && summary.serviceApprovals.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                Outside-Contract & Chargeable Approval Requests ({summary.serviceApprovals.length})
+              </h4>
+              <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px' }}>Req #</th>
+                      <th style={{ padding: '8px 12px' }}>Date</th>
+                      <th style={{ padding: '8px 12px' }}>Asset ID</th>
+                      <th style={{ padding: '8px 12px' }}>Activity</th>
+                      <th style={{ padding: '8px 12px' }}>Reason</th>
+                      <th style={{ padding: '8px 12px' }}>Est. Cost</th>
+                      <th style={{ padding: '8px 12px' }}>Commercial Status</th>
+                      <th style={{ padding: '8px 12px' }}>Approval Status</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.serviceApprovals.map(req => (
+                      <tr key={req.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 700 }}>{req.requestNumber}</td>
+                        <td style={{ padding: '8px 12px', color: '#64748B' }}>{req.createdDate}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, color: '#2563EB' }}>{req.positionId}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 600 }}>{req.activityTitle}</td>
+                        <td style={{ padding: '8px 12px', color: '#475569', maxWidth: '220px' }}>{req.technicalReason}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 700, color: '#0F172A' }}>{req.estimatedCost}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            backgroundColor: '#FEE2E2',
+                            color: '#B91C1C'
+                          }}>
+                            {req.commercialStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            backgroundColor: req.status === 'Approved' ? '#DCFCE7' : req.status === 'Rejected' ? '#FEE2E2' : '#FEF3C7',
+                            color: req.status === 'Approved' ? '#15803D' : req.status === 'Rejected' ? '#B91C1C' : '#B45309'
+                          }}>
+                            {req.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          {req.status === 'Pending Approval' ? (
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                              <button
+                                onClick={() => {
+                                  processServiceApproval(req.id, 'Approved', { approvedBy: 'Client Safety Officer / Manager' });
+                                  setClientsList(getAllClients360List());
+                                }}
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#059669',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  fontSize: '0.72rem',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => {
+                                  processServiceApproval(req.id, 'Rejected', { rejectedBy: 'Client Manager', notes: 'Deferred to next cycle' });
+                                  setClientsList(getAllClients360List());
+                                }}
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#DC2626',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  fontSize: '0.72rem',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>{req.approvalDate || 'Processed'}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1209,6 +1367,7 @@ export default function Client360ReportScreen({
                   <th style={{ padding: '9px 12px' }}>Location</th>
                   <th style={{ padding: '9px 12px' }}>Defect Observation</th>
                   <th style={{ padding: '9px 12px' }}>Severity</th>
+                  <th style={{ padding: '9px 12px' }}>Contract Entitlement</th>
                   <th style={{ padding: '9px 12px' }}>Technician</th>
                   <th style={{ padding: '9px 12px' }}>Status</th>
                   <th style={{ padding: '9px 12px', textAlign: 'center' }}>Action</th>
@@ -1233,6 +1392,21 @@ export default function Client360ReportScreen({
                       }}>
                         {p.severity}
                       </span>
+                    </td>
+                    <td style={{ padding: '9px 12px' }}>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        backgroundColor: p.commercialStatus === 'Contract Covered' ? '#DCFCE7' : p.commercialStatus === 'Outside Contract Coverage' ? '#FEE2E2' : '#DBEAFE',
+                        color: p.commercialStatus === 'Contract Covered' ? '#15803D' : p.commercialStatus === 'Outside Contract Coverage' ? '#B91C1C' : '#1E40AF'
+                      }}>
+                        {p.commercialStatus || 'Contract Covered'}
+                      </span>
+                      <div style={{ fontSize: '0.68rem', color: '#64748B', marginTop: '2px' }}>
+                        {p.requiredActivityTitle || p.requiredActivity || 'Rectification'}
+                      </div>
                     </td>
                     <td style={{ padding: '9px 12px', color: '#475569' }}>{p.technicianName}</td>
                     <td style={{ padding: '9px 12px' }}>

@@ -13,7 +13,8 @@ import {
   getChecklistSession,
   submitAssetObservation,
   completeChecklistSession,
-  getPendingAssetsForSite
+  getPendingAssetsForSite,
+  evaluateInspectionFindingPokaYoke
 } from '../data/storage';
 import jsQR from 'jsqr';
 import { 
@@ -1089,6 +1090,72 @@ export default function DigitalChecklistScreen({
         }}>
           {template.standardNote}
         </div>
+
+        {/* Poka-Yoke Contract Coverage Validation Live Banner */}
+        {activeAsset && Object.values(activeAnswers).some(v => v === 'NOT_OK' || v === 'FAIL' || v === 'X') && (() => {
+          const failedItem = template.items.find(it => activeAnswers[it.itemNo] === 'NOT_OK' || activeAnswers[it.itemNo] === 'FAIL');
+          const evalResult = evaluateInspectionFindingPokaYoke(
+            activeSite,
+            activeAsset,
+            activeRemarks,
+            failedItem?.title || ''
+          );
+          const isCovered = evalResult.commercialAuthorization.isAuthorized;
+          const commStatus = evalResult.commercialAuthorization.commercialStatus;
+          const req = evalResult.technicalRequirement;
+
+          return (
+            <div style={{
+              margin: '10px 14px',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: `1.5px solid ${isCovered ? '#86EFAC' : '#FCA5A5'}`,
+              backgroundColor: isCovered ? '#F0FDF4' : '#FEF2F2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    backgroundColor: isCovered ? '#DCFCE7' : '#FEE2E2',
+                    color: isCovered ? '#15803D' : '#B91C1C'
+                  }}>
+                    {isCovered ? '✓ CONTRACT COVERED' : '⚠️ OUTSIDE CONTRACT COVERAGE'}
+                  </span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>
+                    Required Service: {req.title}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                    ({activeSite?.contractType || 'AMC'}: {commStatus})
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: isCovered ? '#166534' : '#991B1B' }}>
+                  {evalResult.commercialAuthorization.reason}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{
+                  display: 'inline-block',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  backgroundColor: isCovered ? '#059669' : '#DC2626',
+                  color: '#FFFFFF'
+                }}>
+                  {isCovered ? 'Workflow: Auto-Create Activity' : 'Workflow: Approval / Quotation Required'}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ====================================================================
             2. LANDSCAPE CHECKLIST MATRIX TABLE

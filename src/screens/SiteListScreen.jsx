@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, getPositions, addSite, updateSite, deleteSite, clearAllClientData, seedDemoClientData } from '../data/storage';
 import { deleteSiteFromSupabase, clearSupabaseClientData, saveSiteToSupabase, fetchSitesFromSupabase } from '../services/supabaseBackup.js';
+import { 
+  CONTRACT_TYPES, 
+  COVERAGE_STATUSES, 
+  getDefaultServiceCoverage, 
+  SERVICE_ACTIVITIES, 
+  SERVICE_ACTIVITY_LABELS 
+} from '../data/contractCoverageEngine.js';
 import TemplateMappingsModal from '../components/TemplateMappingsModal';
 import EquipmentMasterModal from '../components/EquipmentMasterModal';
 import { 
@@ -110,9 +117,12 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
       address: 'Industrial Estate, GIDC',
       poNumber: `PO/IFS/${today.getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
       poDate: todayStr,
+      contractType: CONTRACT_TYPES.AMC,
       amcType: 'Quarterly',
       noOfVisits: 4,
-      amcExpiryDate: nextYearStr
+      amcExpiryDate: nextYearStr,
+      serviceCoverage: getDefaultServiceCoverage(CONTRACT_TYPES.AMC, 'Quarterly'),
+      contractExclusions: ''
     };
   };
 
@@ -208,6 +218,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
   const handleOpenEdit = (site, e) => {
     if (e) e.stopPropagation();
     setActiveClient(site);
+    const contractType = site.contractType || (site.amcType?.toUpperCase().includes('ARC') ? CONTRACT_TYPES.ARC : CONTRACT_TYPES.AMC);
     setFormData({
       clientName: site.clientName || site.name || '',
       contactPhone: site.contactPhone || '',
@@ -217,9 +228,12 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
       address: site.address || '',
       poNumber: site.poNumber || '',
       poDate: site.poDate || '',
+      contractType,
       amcType: site.amcType || site.frequency || 'Quarterly',
       noOfVisits: site.noOfVisits !== undefined ? site.noOfVisits : 4,
-      amcExpiryDate: site.amcExpiryDate || ''
+      amcExpiryDate: site.amcExpiryDate || '',
+      serviceCoverage: site.serviceCoverage || getDefaultServiceCoverage(contractType, site.amcType),
+      contractExclusions: site.contractExclusions || ''
     });
     setIsEditModalOpen(true);
   };
@@ -1734,6 +1748,98 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                     onChange={(e) => setFormData({ ...formData, amcExpiryDate: e.target.value })}
                   />
                 </div>
+
+                {/* Contract Model & Poka-Yoke Service Coverage */}
+                <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '10px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
+                      Contract Model & Service Entitlements (Poka-Yoke)
+                    </label>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#4B5563', fontWeight: 600 }}>Type:</span>
+                      <select
+                        className="input-field"
+                        value={formData.contractType || 'AMC'}
+                        onChange={(e) => {
+                          const cType = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            contractType: cType,
+                            serviceCoverage: getDefaultServiceCoverage(cType, prev.amcType)
+                          }));
+                        }}
+                        style={{ height: '30px', fontSize: '0.74rem', padding: '2px 8px', width: 'auto' }}
+                      >
+                        <option value="AMC">AMC (Annual Maintenance)</option>
+                        <option value="ARC">ARC (Annual Rate Contract)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#F8FAFC', padding: '10px', borderRadius: '6px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B', marginBottom: '8px' }}>
+                      Define covered vs out-of-scope work. Unauthorized activities automatically halt and prompt customer quotation.
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                      {Object.entries(SERVICE_ACTIVITY_LABELS).map(([actKey, actLabel]) => (
+                        <div key={actKey} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#334155' }}>{actLabel}</span>
+                          <select
+                            className="input-field"
+                            value={formData.serviceCoverage?.[actKey] || 'Requires Approval'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData(prev => ({
+                                ...prev,
+                                serviceCoverage: {
+                                  ...(prev.serviceCoverage || {}),
+                                  [actKey]: val
+                                }
+                              }));
+                            }}
+                            style={{
+                              height: '32px',
+                              fontSize: '0.74rem',
+                              padding: '2px 6px',
+                              backgroundColor: 
+                                formData.serviceCoverage?.[actKey] === 'Included' ? '#DCFCE7' :
+                                formData.serviceCoverage?.[actKey] === 'Excluded' ? '#FEE2E2' :
+                                formData.serviceCoverage?.[actKey] === 'Chargeable / Additional Work' ? '#DBEAFE' :
+                                formData.serviceCoverage?.[actKey] === 'Requires Approval' ? '#FEF3C7' : '#FFFFFF',
+                              color: 
+                                formData.serviceCoverage?.[actKey] === 'Included' ? '#15803D' :
+                                formData.serviceCoverage?.[actKey] === 'Excluded' ? '#B91C1C' :
+                                formData.serviceCoverage?.[actKey] === 'Chargeable / Additional Work' ? '#1E40AF' :
+                                formData.serviceCoverage?.[actKey] === 'Requires Approval' ? '#B45309' : '#1E293B',
+                              fontWeight: 600
+                            }}
+                          >
+                            <option value="Included">Included (Covered)</option>
+                            <option value="Excluded">Excluded (Out of Scope)</option>
+                            <option value="Chargeable / Additional Work">Chargeable (Rate Card)</option>
+                            <option value="Requires Approval">Requires Approval</option>
+                            <option value="Not Configured">Not Configured</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '2px' }}>
+                      Contract Exclusions & Quotation Thresholds
+                    </label>
+                    <textarea
+                      rows="2"
+                      className="input-field"
+                      placeholder="e.g. Refilling excluded from AMC; hydro testing requires customer PO; piping repairs over ₹5,000 extra."
+                      value={formData.contractExclusions || ''}
+                      onChange={(e) => setFormData({ ...formData, contractExclusions: e.target.value })}
+                      style={{ fontSize: '0.76rem', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
@@ -1973,6 +2079,98 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                     value={formData.amcExpiryDate}
                     onChange={(e) => setFormData({ ...formData, amcExpiryDate: e.target.value })}
                   />
+                </div>
+
+                {/* Contract Model & Poka-Yoke Service Coverage */}
+                <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '10px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
+                      Contract Model & Service Entitlements (Poka-Yoke)
+                    </label>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#4B5563', fontWeight: 600 }}>Type:</span>
+                      <select
+                        className="input-field"
+                        value={formData.contractType || 'AMC'}
+                        onChange={(e) => {
+                          const cType = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            contractType: cType,
+                            serviceCoverage: getDefaultServiceCoverage(cType, prev.amcType)
+                          }));
+                        }}
+                        style={{ height: '30px', fontSize: '0.74rem', padding: '2px 8px', width: 'auto' }}
+                      >
+                        <option value="AMC">AMC (Annual Maintenance)</option>
+                        <option value="ARC">ARC (Annual Rate Contract)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#F8FAFC', padding: '10px', borderRadius: '6px', border: '1px solid #E2E8F0', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B', marginBottom: '8px' }}>
+                      Define covered vs out-of-scope work. Unauthorized activities automatically halt and prompt customer quotation.
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                      {Object.entries(SERVICE_ACTIVITY_LABELS).map(([actKey, actLabel]) => (
+                        <div key={actKey} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#334155' }}>{actLabel}</span>
+                          <select
+                            className="input-field"
+                            value={formData.serviceCoverage?.[actKey] || 'Requires Approval'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData(prev => ({
+                                ...prev,
+                                serviceCoverage: {
+                                  ...(prev.serviceCoverage || {}),
+                                  [actKey]: val
+                                }
+                              }));
+                            }}
+                            style={{
+                              height: '32px',
+                              fontSize: '0.74rem',
+                              padding: '2px 6px',
+                              backgroundColor: 
+                                formData.serviceCoverage?.[actKey] === 'Included' ? '#DCFCE7' :
+                                formData.serviceCoverage?.[actKey] === 'Excluded' ? '#FEE2E2' :
+                                formData.serviceCoverage?.[actKey] === 'Chargeable / Additional Work' ? '#DBEAFE' :
+                                formData.serviceCoverage?.[actKey] === 'Requires Approval' ? '#FEF3C7' : '#FFFFFF',
+                              color: 
+                                formData.serviceCoverage?.[actKey] === 'Included' ? '#15803D' :
+                                formData.serviceCoverage?.[actKey] === 'Excluded' ? '#B91C1C' :
+                                formData.serviceCoverage?.[actKey] === 'Chargeable / Additional Work' ? '#1E40AF' :
+                                formData.serviceCoverage?.[actKey] === 'Requires Approval' ? '#B45309' : '#1E293B',
+                              fontWeight: 600
+                            }}
+                          >
+                            <option value="Included">Included (Covered)</option>
+                            <option value="Excluded">Excluded (Out of Scope)</option>
+                            <option value="Chargeable / Additional Work">Chargeable (Rate Card)</option>
+                            <option value="Requires Approval">Requires Approval</option>
+                            <option value="Not Configured">Not Configured</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '2px' }}>
+                      Contract Exclusions & Quotation Thresholds
+                    </label>
+                    <textarea
+                      rows="2"
+                      className="input-field"
+                      placeholder="e.g. Refilling excluded from AMC; hydro testing requires customer PO; piping repairs over ₹5,000 extra."
+                      value={formData.contractExclusions || ''}
+                      onChange={(e) => setFormData({ ...formData, contractExclusions: e.target.value })}
+                      style={{ fontSize: '0.76rem', resize: 'vertical' }}
+                    />
+                  </div>
                 </div>
               </div>
 

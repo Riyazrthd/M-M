@@ -4,6 +4,35 @@
 import { DEMO_USERS, DEMO_SITES, DEMO_POSITIONS, DEMO_ACTIVE_VISIT } from './sampleData.js';
 import { INITIAL_TEMPLATE_MAPPINGS, INITIAL_EQUIPMENT_MASTER, resolveChecklistMapping } from './templateMappings.js';
 import { parseScannedQRToken } from '../utils/qrUrlHelper.js';
+import {
+  CONTRACT_TYPES,
+  SERVICE_ACTIVITIES,
+  SERVICE_ACTIVITY_LABELS,
+  COVERAGE_STATUSES,
+  COVERAGE_STATUS_STYLES,
+  getDefaultServiceCoverage,
+  validateServiceContractCoverage,
+  evaluateInspectionFindingPokaYoke,
+  getServiceApprovals,
+  saveServiceApprovals,
+  createServiceApprovalRequest,
+  processServiceApproval
+} from './contractCoverageEngine.js';
+
+export {
+  CONTRACT_TYPES,
+  SERVICE_ACTIVITIES,
+  SERVICE_ACTIVITY_LABELS,
+  COVERAGE_STATUSES,
+  COVERAGE_STATUS_STYLES,
+  getDefaultServiceCoverage,
+  validateServiceContractCoverage,
+  evaluateInspectionFindingPokaYoke,
+  getServiceApprovals,
+  saveServiceApprovals,
+  createServiceApprovalRequest,
+  processServiceApproval
+};
 
 export const STORAGE_KEYS = {
   CURRENT_USER: 'ifspl_amc_user',
@@ -18,7 +47,8 @@ export const STORAGE_KEYS = {
   QR_REGISTRY: 'ifspl_amc_qr_registry',
   QR_SEQUENCE: 'ifspl_amc_qr_sequence',
   DELETED_SITE_IDS: 'ifspl_amc_deleted_sites',
-  PUNCH_ITEMS: 'ifspl_amc_punch_items'
+  PUNCH_ITEMS: 'ifspl_amc_punch_items',
+  SERVICE_APPROVALS: 'ifspl_amc_service_approvals'
 };
 
 /**
@@ -398,6 +428,7 @@ export function addSite(siteData) {
   const nextYearStr = nextYear.toISOString().slice(0, 10);
 
   const amcType = siteData.amcType || siteData.frequency || 'Quarterly';
+  const contractType = siteData.contractType || (amcType.toUpperCase().includes('ARC') ? CONTRACT_TYPES.ARC : CONTRACT_TYPES.AMC);
   let defaultVisits = 4;
   if (amcType === 'Monthly') defaultVisits = 12;
   else if (amcType === 'Bi-Monthly') defaultVisits = 6;
@@ -416,11 +447,16 @@ export function addSite(siteData) {
     city: siteData.city || 'Vadodara',
     poNumber: siteData.poNumber || `PO/IFSPL/${today.getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
     poDate: siteData.poDate || todayStr,
+    contractType: contractType,
     amcType: amcType,
     frequency: amcType,
     noOfVisits: siteData.noOfVisits !== undefined ? Number(siteData.noOfVisits) : defaultVisits,
     amcExpiryDate: siteData.amcExpiryDate || nextYearStr,
     contractPeriod: siteData.contractPeriod || `${siteData.poDate || todayStr} to ${siteData.amcExpiryDate || nextYearStr}`,
+    serviceCoverage: siteData.serviceCoverage || getDefaultServiceCoverage(contractType, amcType),
+    coveredAssetCategories: siteData.coveredAssetCategories || ['Fire Extinguisher', 'Hydrant System', 'Hose Box', 'Fire Alarm'],
+    contractExclusions: siteData.contractExclusions || '',
+    requiresClientApprovalForAdditionalWork: siteData.requiresClientApprovalForAdditionalWork !== undefined ? Boolean(siteData.requiresClientApprovalForAdditionalWork) : true,
     clientContact: siteData.clientContact || 'Primary Contact',
     contactPhone: siteData.contactPhone || '+91 98000 00000',
     email: siteData.email || 'contact@client.demo',
@@ -443,6 +479,7 @@ export function updateSite(siteId, updatedData) {
   if (index === -1) return null;
 
   const amcType = updatedData.amcType || updatedData.frequency || sites[index].amcType || sites[index].frequency || 'Quarterly';
+  const contractType = updatedData.contractType || sites[index].contractType || (amcType.toUpperCase().includes('ARC') ? CONTRACT_TYPES.ARC : CONTRACT_TYPES.AMC);
 
   sites[index] = {
     ...sites[index],
@@ -452,10 +489,15 @@ export function updateSite(siteId, updatedData) {
     company: updatedData.clientName || updatedData.company || sites[index].company,
     poNumber: updatedData.poNumber !== undefined ? updatedData.poNumber : sites[index].poNumber,
     poDate: updatedData.poDate !== undefined ? updatedData.poDate : sites[index].poDate,
+    contractType: contractType,
     amcType: amcType,
     frequency: amcType,
     noOfVisits: updatedData.noOfVisits !== undefined ? Number(updatedData.noOfVisits) : sites[index].noOfVisits,
-    amcExpiryDate: updatedData.amcExpiryDate !== undefined ? updatedData.amcExpiryDate : sites[index].amcExpiryDate
+    amcExpiryDate: updatedData.amcExpiryDate !== undefined ? updatedData.amcExpiryDate : sites[index].amcExpiryDate,
+    serviceCoverage: updatedData.serviceCoverage !== undefined ? updatedData.serviceCoverage : (sites[index].serviceCoverage || getDefaultServiceCoverage(contractType, amcType)),
+    coveredAssetCategories: updatedData.coveredAssetCategories !== undefined ? updatedData.coveredAssetCategories : (sites[index].coveredAssetCategories || ['Fire Extinguisher', 'Hydrant System', 'Hose Box', 'Fire Alarm']),
+    contractExclusions: updatedData.contractExclusions !== undefined ? updatedData.contractExclusions : (sites[index].contractExclusions || ''),
+    requiresClientApprovalForAdditionalWork: updatedData.requiresClientApprovalForAdditionalWork !== undefined ? Boolean(updatedData.requiresClientApprovalForAdditionalWork) : (sites[index].requiresClientApprovalForAdditionalWork ?? true)
   };
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(sites));
   notifyDataChanged('site_updated', siteId, sites[index]);
@@ -2449,7 +2491,15 @@ function initializeDefaultPunchItems() {
         if (itemVal && (itemVal.status === 'NOT_OK' || itemVal.status === 'FAIL' || itemVal.status === 'X')) {
           const punchNo = `PNC-2026-${String(seq++).padStart(3, '0')}`;
           const isCritical = itemNo === '2' || itemNo === 2 || (itemVal.reason && itemVal.reason.toLowerCase().includes('pressure'));
-          list.push({
+          
+          const evaluation = evaluateInspectionFindingPokaYoke(
+            s,
+            pos || { positionId: posId, equipmentCategory: pos?.equipmentCategory, equipmentType: pos?.equipmentType },
+            itemVal.reason || itemVal.remarks || '',
+            itemVal.title || ''
+          );
+
+          const punchRecord = {
             id: `PUNCH-${v.visitId || v.id}-${posId}-${itemNo}`,
             punchNo,
             punchDate: v.date || '2026-10-26',
@@ -2468,6 +2518,16 @@ function initializeDefaultPunchItems() {
             defectObservation: itemVal.reason || itemVal.remarks || 'Defect identified during scheduled AMC maintenance',
             defectCategory: isCritical ? 'Hydraulic / Pressure Integrity' : 'Mechanical & Housing Integrity',
             severity: isCritical ? 'Critical' : 'Major',
+            // Poka-Yoke Contract Entitlement
+            requiredActivity: evaluation.technicalRequirement.activityType,
+            requiredActivityTitle: evaluation.technicalRequirement.title,
+            commercialStatus: evaluation.commercialAuthorization.commercialStatus,
+            coverageStatus: evaluation.commercialAuthorization.coverageStatus,
+            autoAuthorized: evaluation.autoProceedWithService,
+            approvalRequired: evaluation.approvalRequired,
+            approvalStatus: evaluation.autoProceedWithService ? 'Auto-Approved (Under Contract)' : 'Pending Client Approval',
+            contractType: s?.contractType || 'AMC',
+            pokaYokeReason: evaluation.commercialAuthorization.reason,
             technicianName: v.technicianName || v.serviceEngineer || 'Ramesh Patel',
             technicianBadge: v.technicianBadge || 'IFS-SE-041',
             responsibleDept: 'IFS Field Technical Team',
@@ -2479,7 +2539,26 @@ function initializeDefaultPunchItems() {
             evidencePhoto: itemVal.photo || (itemVal.photos && itemVal.photos[0]?.url) || null,
             closurePhoto: null,
             createdAt: v.startedAt || new Date().toISOString()
-          });
+          };
+
+          list.push(punchRecord);
+
+          // Seed outside contract approval workflow if required
+          if (evaluation.approvalRequired) {
+            createServiceApprovalRequest({
+              siteId: v.siteId,
+              clientName,
+              siteName,
+              positionId: posId,
+              qrCode: pos?.qrCode || `IFS-QR-${posId}`,
+              assetName: pos?.currentEquipment?.equipmentName || pos?.equipmentType || 'Fire Extinguisher',
+              punchId: punchRecord.id,
+              punchNo: punchRecord.punchNo,
+              activityType: evaluation.technicalRequirement.activityType,
+              commercialStatus: evaluation.commercialAuthorization.commercialStatus,
+              technicalReason: punchRecord.defectObservation
+            });
+          }
         }
       });
     });
@@ -2613,14 +2692,24 @@ export function updatePunchItem(punchId, updates = {}) {
  */
 export function addPunchItem(punchData) {
   const list = getPunchItems();
+  const sites = getSites();
+  const s = sites.find(site => site.id === punchData.siteId) || getSiteById(punchData.siteId);
+
+  const evaluation = evaluateInspectionFindingPokaYoke(
+    s,
+    { positionId: punchData.positionId, equipmentCategory: punchData.assetCategory, equipmentType: punchData.assetType },
+    punchData.defectObservation || '',
+    punchData.failedItemTitle || ''
+  );
+
   const seq = list.length + 1;
   const newPunch = {
     id: punchData.id || `PUNCH-MANUAL-${Date.now()}`,
     punchNo: punchData.punchNo || `PNC-2026-${String(seq).padStart(3, '0')}`,
     punchDate: punchData.punchDate || new Date().toISOString().substring(0, 10),
-    clientName: punchData.clientName || 'Client Organization',
+    clientName: punchData.clientName || s?.clientName || 'Client Organization',
     siteId: punchData.siteId || 'SITE-001',
-    siteName: punchData.siteName || 'Facility Plant',
+    siteName: punchData.siteName || s?.plantFacility || 'Facility Plant',
     visitId: punchData.visitId || 'VISIT-CURRENT',
     positionId: punchData.positionId || 'POS-001',
     qrCode: punchData.qrCode || 'IFS-QR-000001',
@@ -2632,7 +2721,17 @@ export function addPunchItem(punchData) {
     failedItemTitle: punchData.failedItemTitle || 'Operational Defect',
     defectObservation: punchData.defectObservation || 'Defect noted',
     defectCategory: punchData.defectCategory || 'Mechanical',
-    severity: punchData.severity || 'Major',
+    severity: punchData.severity || evaluation.technicalRequirement.severity || 'Major',
+    // Poka-Yoke Contract Validation
+    requiredActivity: punchData.requiredActivity || evaluation.technicalRequirement.activityType,
+    requiredActivityTitle: punchData.requiredActivityTitle || evaluation.technicalRequirement.title,
+    commercialStatus: punchData.commercialStatus || evaluation.commercialAuthorization.commercialStatus,
+    coverageStatus: punchData.coverageStatus || evaluation.commercialAuthorization.coverageStatus,
+    autoAuthorized: punchData.autoAuthorized !== undefined ? punchData.autoAuthorized : evaluation.autoProceedWithService,
+    approvalRequired: punchData.approvalRequired !== undefined ? punchData.approvalRequired : evaluation.approvalRequired,
+    approvalStatus: punchData.approvalStatus || (evaluation.autoProceedWithService ? 'Auto-Approved (Under Contract)' : 'Pending Client Approval'),
+    contractType: s?.contractType || 'AMC',
+    pokaYokeReason: evaluation.commercialAuthorization.reason,
     technicianName: punchData.technicianName || 'Ramesh Patel',
     technicianBadge: punchData.technicianBadge || 'IFS-SE-041',
     responsibleDept: 'IFS Field Technical Team',
@@ -2649,6 +2748,23 @@ export function addPunchItem(punchData) {
   list.unshift(newPunch);
   localStorage.setItem(STORAGE_KEYS.PUNCH_ITEMS, JSON.stringify(list));
   notifyDataChanged('punch_item_added', newPunch.id, newPunch);
+
+  if (newPunch.approvalRequired) {
+    createServiceApprovalRequest({
+      siteId: newPunch.siteId,
+      clientName: newPunch.clientName,
+      siteName: newPunch.siteName,
+      positionId: newPunch.positionId,
+      qrCode: newPunch.qrCode,
+      assetName: newPunch.assetName,
+      punchId: newPunch.id,
+      punchNo: newPunch.punchNo,
+      activityType: newPunch.requiredActivity,
+      commercialStatus: newPunch.commercialStatus,
+      technicalReason: newPunch.defectObservation
+    });
+  }
+
   return { success: true, punchItem: newPunch };
 }
 
@@ -3080,21 +3196,24 @@ export function getClient360Summary(clientIdentifier = null) {
       startDate: primarySite.poDate || '2026-04-01',
       endDate: expiryDate,
       duration: '12 Months (1 Year Comprehensive)',
+      contractType: primarySite.contractType || (primarySite.amcType?.toUpperCase().includes('ARC') ? 'ARC' : 'AMC'),
       amcType: primarySite.amcType || primarySite.frequency || 'Quarterly',
       frequency: primarySite.frequency || primarySite.amcType || 'Quarterly',
       plannedVisits,
       completedVisits,
       remainingVisits,
       contractValue: `₹${(totalAssets * 450).toLocaleString('en-IN')}`,
-      billingTerms: 'Quarterly In Arrears on Acceptance of Field Sign-Off (Net 30)',
-      serviceScope: 'Routine AMC Servicing, IS 2190 Pressure Testing, Defect Rectification & Statutory Audit Verification',
-      includedCategories: 'Fire Extinguishers, Hydrants, Hose Boxes, Hose Reels, Alarm Panels',
-      contractCoverage: '100% Comprehensive Parts & Labour for Approved Standard Spares',
-      excludedServices: 'Capital piping replacements exceeding ₹15,000 without written amendment',
+      billingTerms: primarySite.contractType === 'ARC' ? 'Schedule of Rates (Per-Service Itemized Invoicing)' : 'Quarterly In Arrears on Acceptance of Field Sign-Off (Net 30)',
+      serviceScope: primarySite.amcType || 'Routine AMC Servicing, IS 2190 Pressure Testing, Defect Rectification & Statutory Audit Verification',
+      includedCategories: Array.isArray(primarySite.coveredAssetCategories) ? primarySite.coveredAssetCategories.join(', ') : 'Fire Extinguishers, Hydrants, Hose Boxes, Hose Reels, Alarm Panels',
+      contractCoverage: primarySite.contractType === 'ARC' ? 'Rate Contract — Itemized Standard Rate Schedule' : '100% Comprehensive Parts & Labour for Approved Standard Spares',
+      excludedServices: primarySite.contractExclusions || 'Capital piping replacements exceeding ₹15,000 without written amendment',
+      serviceCoverage: primarySite.serviceCoverage || getDefaultServiceCoverage(primarySite.contractType, primarySite.amcType),
       renewalAlert: renewalStatus,
       daysToExpiry: diffDays,
       responsibleCoordinator: 'Sanjay Sharma (Lead AMC Coordinator)'
     },
+    serviceApprovals: getServiceApprovals(clientName),
     sites: sitesList,
     assets: assetRegister,
     visits: clientVisits,
