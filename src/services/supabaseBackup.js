@@ -313,17 +313,44 @@ CREATE TABLE IF NOT EXISTS public.qr_registry (
     assigned_date VARCHAR(64),
     assigned_by VARCHAR(128),
     lifecycle_status VARCHAR(64) DEFAULT 'Active',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ============================================================================
+-- AUTO-MIGRATIONS FOR EXISTING SUPABASE TABLES
+-- Ensures updated_at and required columns exist even on existing database schemas
+-- ============================================================================
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'sites' AND column_name = 'updated_at') THEN
+        ALTER TABLE public.sites ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'updated_at') THEN
+        ALTER TABLE public.positions ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'visits' AND column_name = 'updated_at') THEN
+        ALTER TABLE public.visits ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'qr_registry' AND column_name = 'updated_at') THEN
+        ALTER TABLE public.qr_registry ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+END $$;
 
 -- ============================================================================
 -- PERFORMANCE INDEXES
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_sites_code ON public.sites(code);
+CREATE INDEX IF NOT EXISTS idx_sites_updated_at ON public.sites(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_positions_qr_code ON public.positions(qr_code);
 CREATE INDEX IF NOT EXISTS idx_positions_site_id ON public.positions(site_id);
 CREATE INDEX IF NOT EXISTS idx_positions_equipment_type ON public.positions(equipment_type);
+CREATE INDEX IF NOT EXISTS idx_positions_updated_at ON public.positions(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_visits_site_id ON public.visits(site_id);
+CREATE INDEX IF NOT EXISTS idx_visits_updated_at ON public.visits(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_equipment_master_cat ON public.equipment_master(category);
 CREATE INDEX IF NOT EXISTS idx_qr_registry_token ON public.qr_registry(token);
 CREATE INDEX IF NOT EXISTS idx_qr_registry_batch ON public.qr_registry(batch_id);
