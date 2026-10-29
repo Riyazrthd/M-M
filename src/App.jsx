@@ -499,7 +499,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* 1. Makoro Enterprise Left Sidebar */}
       <Sidebar
         currentScreen={currentScreen}

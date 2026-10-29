@@ -98,7 +98,7 @@ export default function Sidebar({
 
       {/* Main Sidebar Container */}
       <aside 
-        className={`app-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
+        className={`app-sidebar ${isMobileOpen ? 'mobile-open' : ''} ${isCollapsed ? 'collapsed' : ''}`}
         style={{
           width: isCollapsed ? '68px' : '260px',
           minWidth: isCollapsed ? '68px' : '260px',
@@ -107,9 +107,10 @@ export default function Sidebar({
           backgroundColor: '#F7F8F9',
           borderRight: '1px solid #E1E5E9',
           height: '100vh',
-          position: 'sticky',
+          position: 'fixed',
           top: 0,
           left: 0,
+          bottom: 0,
           zIndex: 70,
           display: 'flex',
           flexDirection: 'column',
