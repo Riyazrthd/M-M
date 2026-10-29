@@ -6,7 +6,10 @@ import {
   getPositions, 
   getVisits, 
   getPlantTechnicians,
-  getQRRegistry
+  getQRRegistry,
+  getDeletedSiteIds,
+  removeDeletedSiteId,
+  clearDeletedSiteIds
 } from '../data/storage.js';
 import { 
   INITIAL_TEMPLATE_MAPPINGS, 
@@ -706,6 +709,81 @@ export async function testSupabaseConnection(url, anonKey) {
   }
 }
 
+// Delete an individual site and cascade its positions and visits in Supabase Cloud
+export async function deleteSiteFromSupabase(siteId) {
+  if (!siteId) return { success: false, error: 'siteId is required' };
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey) return { success: false, error: 'No cloud config' };
+
+  const cleanUrl = cfg.url.trim().replace(/\/+$/, '');
+  const cleanKey = cfg.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  const encodedId = encodeURIComponent(siteId);
+
+  try {
+    // 1. Delete associated positions in Supabase
+    await fetch(`${cleanUrl}/rest/v1/positions?site_id=eq.${encodedId}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    // 2. Delete associated visits in Supabase
+    await fetch(`${cleanUrl}/rest/v1/visits?site_id=eq.${encodedId}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    // 3. Delete the site in Supabase
+    const res = await fetch(`${cleanUrl}/rest/v1/sites?id=eq.${encodedId}`, {
+      method: 'DELETE',
+      headers
+    });
+
+    if (res.ok) {
+      removeDeletedSiteId(siteId);
+      return { success: true };
+    } else {
+      const err = await res.text();
+      console.warn('Supabase site delete response:', err);
+      return { success: false, error: err };
+    }
+  } catch (err) {
+    console.warn('deleteSiteFromSupabase error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Wipe all client records (sites, positions, visits) from Supabase Cloud
+export async function clearSupabaseClientData() {
+  const cfg = getSupabaseConfig();
+  if (!cfg.url || !cfg.anonKey) return { success: false, error: 'No cloud config' };
+
+  const cleanUrl = cfg.url.trim().replace(/\/+$/, '');
+  const cleanKey = cfg.anonKey.trim();
+  const headers = {
+    'apikey': cleanKey,
+    'Authorization': `Bearer ${cleanKey}`,
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    // Delete positions, visits, sites in cloud (using not.is.null filter)
+    await fetch(`${cleanUrl}/rest/v1/positions?id=not.is.null`, { method: 'DELETE', headers });
+    await fetch(`${cleanUrl}/rest/v1/visits?id=not.is.null`, { method: 'DELETE', headers });
+    await fetch(`${cleanUrl}/rest/v1/sites?id=not.is.null`, { method: 'DELETE', headers });
+    clearDeletedSiteIds();
+    return { success: true };
+  } catch (err) {
+    console.warn('clearSupabaseClientData error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // Live Push to Supabase Cloud via PostgREST
 export async function pushDataToSupabase(url, anonKey) {
   const conn = await testSupabaseConnection(url, anonKey);
@@ -715,6 +793,16 @@ export async function pushDataToSupabase(url, anonKey) {
 
   const cleanUrl = url.trim().replace(/\/+$/, '');
   const cleanKey = anonKey.trim();
+
+  // Purge any tombstoned deleted sites from remote cloud first
+  const deletedIds = getDeletedSiteIds();
+  if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+    for (const delId of deletedIds) {
+      try {
+        await deleteSiteFromSupabase(delId);
+      } catch (e) {}
+    }
+  }
 
   const headers = {
     'apikey': cleanKey,
@@ -980,9 +1068,28 @@ export async function pullDataFromSupabase(url, anonKey) {
       console.warn('QR registry pull notice:', e);
     }
 
-    // Transform and store locally
-    if (Array.isArray(sites) && sites.length > 0) {
-      const transformedSites = sites.map(s => ({
+    // Transform and store locally with tombstone filtering
+    const deletedSiteIds = getDeletedSiteIds();
+    if (Array.isArray(deletedSiteIds) && deletedSiteIds.length > 0) {
+      deletedSiteIds.forEach(delId => {
+        deleteSiteFromSupabase(delId).catch(() => {});
+      });
+    }
+
+    const activeSites = Array.isArray(sites) 
+      ? sites.filter(s => s && s.id && !deletedSiteIds.includes(s.id))
+      : [];
+
+    const activePositions = Array.isArray(positions)
+      ? positions.filter(p => p && (!p.site_id || !deletedSiteIds.includes(p.site_id)))
+      : [];
+
+    const activeVisits = Array.isArray(visits)
+      ? visits.filter(v => v && (!v.site_id || !deletedSiteIds.includes(v.site_id)))
+      : [];
+
+    if (Array.isArray(sites)) {
+      const transformedSites = activeSites.map(s => ({
         id: s.id,
         clientName: s.client_name || s.name,
         name: s.name,
@@ -1012,8 +1119,8 @@ export async function pullDataFromSupabase(url, anonKey) {
       localStorage.setItem('ifspl_amc_sites', JSON.stringify(transformedSites));
     }
 
-    if (Array.isArray(positions) && positions.length > 0) {
-      const transformedPositions = positions.map(p => ({
+    if (Array.isArray(positions)) {
+      const transformedPositions = activePositions.map(p => ({
         id: p.id,
         positionId: p.position_id || p.id,
         qrCode: p.qr_code,
@@ -1041,8 +1148,8 @@ export async function pullDataFromSupabase(url, anonKey) {
       localStorage.setItem('ifspl_amc_positions', JSON.stringify(transformedPositions));
     }
 
-    if (Array.isArray(visits) && visits.length > 0) {
-      const transformedVisits = visits.map(v => ({
+    if (Array.isArray(visits)) {
+      const transformedVisits = activeVisits.map(v => ({
         id: v.id,
         visitId: v.visit_id || v.id,
         siteId: v.site_id,
@@ -1426,6 +1533,17 @@ export function initBackgroundCloudSync(options = {}) {
       silentCheckAndSync('interval_background');
     }
   }, intervalMs * 4);
+
+  // 5. Listen for explicit cloud delete requests
+  window.addEventListener('ifspl:request_cloud_delete_site', (e) => {
+    if (e.detail?.siteId) {
+      deleteSiteFromSupabase(e.detail.siteId);
+    }
+  });
+
+  window.addEventListener('ifspl:request_cloud_clear_all', () => {
+    clearSupabaseClientData();
+  });
 
   // Initial silent check on application launch
   setTimeout(() => {

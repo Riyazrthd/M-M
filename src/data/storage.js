@@ -16,8 +16,40 @@ export const STORAGE_KEYS = {
   EQUIPMENT_MASTER: 'ifspl_amc_equipment_master',
   PLANT_TECHNICIANS: 'ifspl_amc_plant_technicians',
   QR_REGISTRY: 'ifspl_amc_qr_registry',
-  QR_SEQUENCE: 'ifspl_amc_qr_sequence'
+  QR_SEQUENCE: 'ifspl_amc_qr_sequence',
+  DELETED_SITE_IDS: 'ifspl_amc_deleted_sites'
 };
+
+/**
+ * Tombstone helpers to prevent deleted clients from reappearing after cloud sync or page refresh.
+ */
+export function getDeletedSiteIds() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_SITE_IDS);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function addDeletedSiteId(siteId) {
+  if (!siteId) return;
+  const list = getDeletedSiteIds();
+  if (!list.includes(siteId)) {
+    list.push(siteId);
+    localStorage.setItem(STORAGE_KEYS.DELETED_SITE_IDS, JSON.stringify(list));
+  }
+}
+
+export function removeDeletedSiteId(siteId) {
+  if (!siteId) return;
+  const list = getDeletedSiteIds().filter(id => id !== siteId);
+  localStorage.setItem(STORAGE_KEYS.DELETED_SITE_IDS, JSON.stringify(list));
+}
+
+export function clearDeletedSiteIds() {
+  localStorage.removeItem(STORAGE_KEYS.DELETED_SITE_IDS);
+}
 
 /**
  * Central notification dispatcher for all data mutations.
@@ -60,6 +92,15 @@ export function notifyDataChanged(changeType, entityId = null, payload = null) {
  * Strictly preserves all 26 Checklists, SOPs, Equipment Masters, Template Mappings, and Technicians
  */
 export function clearAllClientData() {
+  // Read all existing site IDs to tombstone them and prevent resurrection
+  let existingSiteIds = [];
+  try {
+    const rawSites = localStorage.getItem(STORAGE_KEYS.SITES);
+    if (rawSites) {
+      existingSiteIds = JSON.parse(rawSites).map(s => s.id);
+    }
+  } catch (e) {}
+
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([]));
@@ -90,11 +131,15 @@ export function clearAllClientData() {
     }
   } catch (e) {}
 
+  // Tombstone removed site IDs
+  existingSiteIds.forEach(id => addDeletedSiteId(id));
+
   localStorage.setItem('ifspl_production_clean_v1', 'true');
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     try {
       window.dispatchEvent(new CustomEvent('storage'));
       window.dispatchEvent(new CustomEvent('ifspl:data_cleared'));
+      window.dispatchEvent(new CustomEvent('ifspl:request_cloud_clear_all'));
     } catch (e) {}
   }
   notifyDataChanged('all_client_data_cleared');
@@ -104,6 +149,7 @@ export function clearAllClientData() {
  * Seed demo client data for evaluation or testing
  */
 export function seedDemoClientData() {
+  clearDeletedSiteIds();
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(DEMO_SITES));
   localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(DEMO_POSITIONS));
   localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify([DEMO_ACTIVE_VISIT]));
@@ -305,8 +351,10 @@ export function getSites() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SITES);
     if (!data) return [];
-    const sites = JSON.parse(data);
-    if (!Array.isArray(sites)) return [];
+    const rawSites = JSON.parse(data);
+    if (!Array.isArray(rawSites)) return [];
+    const deletedIds = getDeletedSiteIds();
+    const sites = deletedIds.length > 0 ? rawSites.filter(s => !deletedIds.includes(s.id)) : rawSites;
     const allPositions = getPositions();
 
     // Dynamically calculate coverage from actual equipment position records
@@ -414,11 +462,84 @@ export function updateSite(siteId, updatedData) {
 }
 
 export function deleteSite(siteId) {
+  if (!siteId) return false;
+
+  // 1. Mark as tombstoned immediately so background pulls never restore it
+  addDeletedSiteId(siteId);
+
+  // 2. Remove from local sites
   const data = localStorage.getItem(STORAGE_KEYS.SITES);
   const sites = data ? JSON.parse(data) : [];
   const filtered = sites.filter(s => s.id !== siteId);
   localStorage.setItem(STORAGE_KEYS.SITES, JSON.stringify(filtered));
+
+  // 3. Cascade delete associated equipment positions from localStorage
+  try {
+    const rawPos = localStorage.getItem(STORAGE_KEYS.POSITIONS);
+    if (rawPos) {
+      const positions = JSON.parse(rawPos);
+      const remainingPos = positions.filter(p => p.siteId !== siteId);
+      localStorage.setItem(STORAGE_KEYS.POSITIONS, JSON.stringify(remainingPos));
+    }
+  } catch (e) {
+    console.warn('Cascade position delete notice:', e);
+  }
+
+  // 4. Cascade delete associated visits from localStorage
+  try {
+    const rawVisits = localStorage.getItem(STORAGE_KEYS.VISITS);
+    if (rawVisits) {
+      const visits = JSON.parse(rawVisits);
+      const remainingVisits = visits.filter(v => v.siteId !== siteId);
+      localStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(remainingVisits));
+    }
+  } catch (e) {
+    console.warn('Cascade visit delete notice:', e);
+  }
+
+  // 5. Reset active visit if it was for this site
+  try {
+    const activeVisitId = localStorage.getItem(STORAGE_KEYS.ACTIVE_VISIT_ID);
+    if (activeVisitId && activeVisitId.includes(siteId)) {
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_VISIT_ID);
+    }
+  } catch (e) {}
+
+  // 6. Clean QR Registry: unassign any QR codes linked to this site's positions
+  try {
+    const rawQr = localStorage.getItem(STORAGE_KEYS.QR_REGISTRY);
+    if (rawQr) {
+      const qrList = JSON.parse(rawQr);
+      const cleaned = qrList.map(qr => {
+        if (qr.linkedPositionId && (qr.linkedPositionId.includes(siteId) || qr.linkedPositionId.startsWith(`POS-${siteId}`))) {
+          return {
+            ...qr,
+            assignmentStatus: 'Available',
+            linkedAssetId: null,
+            linkedPositionId: null,
+            linkedAssetName: null,
+            assignedDate: null,
+            assignedBy: null
+          };
+        }
+        return qr;
+      });
+      localStorage.setItem(STORAGE_KEYS.QR_REGISTRY, JSON.stringify(cleaned));
+    }
+  } catch (e) {}
+
+  // 7. Notify in-app listeners
   notifyDataChanged('site_deleted', siteId);
+
+  // 8. Request cloud deletion directly across the network
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try {
+      window.dispatchEvent(new CustomEvent('ifspl:request_cloud_delete_site', {
+        detail: { siteId }
+      }));
+    } catch (e) {}
+  }
+
   return true;
 }
 
@@ -429,10 +550,12 @@ export function getPositions(siteId = null) {
     if (!data) return [];
     const positions = JSON.parse(data);
     if (!Array.isArray(positions)) return [];
+    const deletedIds = getDeletedSiteIds();
+    const validPositions = deletedIds.length > 0 ? positions.filter(p => !deletedIds.includes(p.siteId)) : positions;
     if (siteId) {
-      return positions.filter(p => p.siteId === siteId);
+      return validPositions.filter(p => p.siteId === siteId);
     }
-    return positions;
+    return validPositions;
   } catch (e) {
     return [];
   }

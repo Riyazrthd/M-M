@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSites, getPositions, addSite, updateSite, deleteSite, clearAllClientData, seedDemoClientData } from '../data/storage';
+import { deleteSiteFromSupabase, clearSupabaseClientData } from '../services/supabaseBackup.js';
 import TemplateMappingsModal from '../components/TemplateMappingsModal';
 import EquipmentMasterModal from '../components/EquipmentMasterModal';
 import { 
@@ -73,6 +74,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
 
   const handleConfirmClearAll = () => {
     clearAllClientData();
+    clearSupabaseClientData().catch(e => console.warn('Cloud clear notice:', e));
     setSites([]);
     setPositions([]);
     setSelectedClientIds([]);
@@ -235,7 +237,9 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
 
   const handleConfirmDelete = () => {
     if (!activeClient) return;
-    deleteSite(activeClient.id);
+    const clientId = activeClient.id;
+    deleteSite(clientId);
+    deleteSiteFromSupabase(clientId).catch(e => console.warn('Cloud delete notice:', e));
     reloadSites();
     setIsDeleteModalOpen(false);
     setActiveClient(null);
