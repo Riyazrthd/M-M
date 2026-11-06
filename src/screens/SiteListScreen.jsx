@@ -716,9 +716,9 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                   </div>
                   <div style={{ minWidth: 0, overflow: 'hidden' }}>
                     <div style={{
-                      fontSize: '0.92rem',
-                      fontWeight: 700,
-                      color: '#111827',
+                      fontSize: '0.84rem',
+                      fontWeight: 500,
+                      color: '#1F2937',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
@@ -727,7 +727,7 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                     </div>
                     <div style={{
                       fontSize: '0.72rem',
-                      color: '#536174',
+                      color: '#6B7280',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
@@ -736,11 +736,11 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
                     }}>
-                      <span style={{ color: '#00875A', fontWeight: 600 }}>
+                      <span style={{ color: '#059669', fontWeight: 500 }}>
                         {site.amcType || site.frequency || 'Quarterly'} ({site.noOfVisits || 4} Visits)
                       </span>
                       <span style={{ color: '#D1D5DB' }}>•</span>
-                      <span style={{ color: '#788494' }}>
+                      <span style={{ color: '#6B7280' }}>
                         Exp: {site.amcExpiryDate || site.contractPeriod || '—'}
                       </span>
                     </div>
@@ -749,8 +749,9 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
 
                 {/* Contact No */}
                 <div style={{
-                  fontSize: '0.86rem',
-                  color: '#374151',
+                  fontSize: '0.82rem',
+                  color: '#4B5563',
+                  fontWeight: 400,
                   whiteSpace: 'nowrap'
                 }}>
                   {site.contactPhone || '—'}
@@ -758,8 +759,9 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
 
                 {/* Email ID */}
                 <div style={{
-                  fontSize: '0.86rem',
+                  fontSize: '0.82rem',
                   color: '#4B5563',
+                  fontWeight: 400,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
@@ -770,10 +772,10 @@ export default function SiteListScreen({ onNavigate, onSelectSite, onSelectPosit
                 {/* PO Number */}
                 <div
                   style={{
-                    fontSize: '0.82rem',
-                    color: '#111827',
+                    fontSize: '0.8rem',
+                    color: '#374151',
                     fontFamily: 'monospace',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
